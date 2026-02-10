@@ -14,23 +14,31 @@ knitr::opts_chunk$set(
   message = FALSE,    # suppress messages
   warning = FALSE     # suppress warnings
 )
+# install.packages(c("odbc", "DBI", "dplyr", "tidyr"))
+#install.packages("ROracle")
+# install.packages("rlang")
+
+library(DBI)
+library(odbc)
+library(dplyr)
+library(tidyr)
+```
+
+```{r connection}
 # ---------------------------------------------------------
 # Create a connection to EDWH (Oracle / Vision schema)
-# NOTE:
-# - Replace DSN, UID, and PWD with secure credentials
-# - In production, credentials should be stored securely
 # ---------------------------------------------------------
 
 con <- DBI::dbConnect(
   odbc::odbc(),
-  Driver   = "Oracle",
-  Host     = "172.16.1.17",
-  Port     = 1521,
-  Service  = "dwhrpddb.bnr.rw",
-  UID      = "MCYABUKOMBE",
-  PWD      = Sys.getenv("EDWH_PWD")
+  Driver = "Oracle in OraDB21Home1",
+  DBQ    = "172.16.1.17:1521/dwhrpddb.bnr.rw",
+  UID    = "MCYABUKOMBE",
+  PWD    = Sys.getenv("Vision123Mbe")
 )
+```
 
+```{r query}
 # ---------------------------------------------------------
 # SQL Query Explanation:
 # - LE_BOOK       : Reporting institution
@@ -60,22 +68,15 @@ ORDER BY
     ca.YEAR_MONTH,
     ast.ALPHA_SUBTAB_DESCRIPTION
 "
-# ---------------------------------------------------------
-# Execute query and bring data into R
-# ---------------------------------------------------------
 
-capital_ar_raw <- dbGetQuery(con, query)
+capital_ar_raw <- DBI::dbGetQuery(con, query)
 
-# Quick structure check
 str(capital_ar_raw)
+```
+
+```{r pivot}
 # ---------------------------------------------------------
-# Pivot Explanation:
-# - Each CAR_LINE_CODE_DESC becomes a column
-# - VALUE_LCY becomes the values
-# - Missing CAR components are filled with 0
-#
-# Final structure:
-# LE_BOOK | YEAR_MONTH | Tier 1 Capital | Tier 2 Capital | ...
+# Pivot: Each CAR_LINE_CODE_DESC becomes a column
 # ---------------------------------------------------------
 
 capital_ar_pivot <- capital_ar_raw %>%
@@ -85,9 +86,12 @@ capital_ar_pivot <- capital_ar_raw %>%
     values_fill = 0
   )
 
-# View final dataset
 head(capital_ar_pivot)
+```
+
+```{r cleanup}
 # ---------------------------------------------------------
 # Always close the database connection
 # ---------------------------------------------------------
-dbDisconnect(con)
+DBI::dbDisconnect(con)
+```
