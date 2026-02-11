@@ -297,6 +297,120 @@ All queries run against the **VISION** schema on an Oracle database. The core ta
 
 ---
 
+## Technical Architecture
+
+### Layers
+
+1. **SQL Extraction Layer**
+   - EDWH queries (this repository)
+   - Aggregation logic and regulatory metric preparation
+   - Date dimension handling for `YEAR_MONTH`
+
+2. **Power BI Semantic Layer**
+   - DAX measures
+   - Time intelligence
+   - Threshold comparison logic
+   - Ranking logic (top borrowers, exposures)
+
+3. **Visualization Layer**
+   - Interactive dashboards
+   - Multi-filter capability (sector / sub-sector / institution drill-down)
+   - Trend tables and graphical monitoring
+   - Actual vs threshold comparison
+
+---
+
+## Implementation Status
+
+### Completed
+
+- Core EDWH extraction queries
+- Capital Adequacy logic (CAR, Tier 1 capital filtering)
+- Related party and insider loan exposure logic
+- Top borrower ranking logic
+- Liquidity queries (top depositors, loan overdraft balances)
+- SACCO equity-to-assets ratio
+- Date dimension handling for `YEAR_MONTH`
+- Folder structuring aligned to supervisory batches
+
+### In Progress
+
+- Threshold comparison refinement
+- Warning signal dashboard enhancement
+- Data validation and reconciliation testing
+- Documentation expansion
+
+### Planned
+
+- Financial statement common-size analysis
+- Advanced early warning indicators
+- Inspector user documentation
+- Formal validation framework
+
+---
+
+## Governance & Versioning
+
+**Branching strategy:**
+
+| Branch | Purpose |
+|--------|---------|
+| `main` | Stable production version |
+| `develop` | Integrated working branch |
+| `feature/*` | Specific metric or dashboard development |
+
+**Versioning approach:**
+
+| Version | Milestone |
+|---------|-----------|
+| v1.0 | Prudential Norms completed |
+| v2.0 | Credit Risk Monitoring added |
+| v3.0 | Financial Statements integrated |
+
+---
+
+## Validation & Control
+
+To ensure supervisory reliability:
+
+- Reconciliation against manual calculations
+- Cross-validation with regulatory thresholds
+- Review of EDWH source integrity
+- Controlled logic for ratio denominators (e.g., Tier 1 Capital)
+
+Outputs are designed to be defensible for management review and inspection.
+
+---
+
+## Intended Users
+
+- MFSD Inspectors
+- MFSD Management
+- Regulatory Analysts
+- Data Governance Team
+
+---
+
+## Future Enhancements
+
+- Full EDWH migration for all prudential metrics
+- Automated threshold alerting
+- Historical back-testing
+- Advanced concentration risk modeling
+- Performance optimization for large datasets
+
+---
+
+## Contact & Ownership
+
+| Role | Team |
+|------|------|
+| Project Owner | Microfinance Supervision Department |
+| Technical Development | Data Analytics Unit |
+| Data Source | Enterprise Data Warehouse (EDWH) |
+
+---
+
 ## Notes
 
 - All monetary values are in **Local Currency (LCY)**
