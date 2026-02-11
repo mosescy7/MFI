@@ -8,7 +8,7 @@ SQL queries and R scripts used to extract regulatory and prudential data from th
 
 ## Background
 
-This repository supports the automation of MFSD frequently used output reports and dashboards sourced from EDWH data. The initiative transitions manual computation of key soundness indicators into automated, reproducible queries that feed a Power BI / R-based dashboard for monitoring Deposit-Taking Microfinance Institutions (DTMFIs).
+This repository supports the automation of MFSD frequently used output reports and dashboards sourced from EDWH data. The initiative transitions manual computation of key soundness indicators into automated, reproducible queries that feed a Power BI for monitoring Deposit-Taking Microfinance Institutions (DTMFIs).
 
 ### Objectives
 
@@ -291,6 +291,7 @@ All queries run against the **VISION** schema on an Oracle database. The core ta
 
 **LE_Book ranges:**
 - **400–999**: All regulated financial institutions (MFIs, SACCOs)
+- **400-500**: Companies or MFI specifically
 - **500–999**: SACCOs specifically
 
 **Institution category types:** `MF`, `SACCO`, `OSACCO`, `DSACCO`
@@ -351,13 +352,7 @@ All queries run against the **VISION** schema on an Oracle database. The core ta
 
 ## Governance & Versioning
 
-**Branching strategy:**
 
-| Branch | Purpose |
-|--------|---------|
-| `main` | Stable production version |
-| `develop` | Integrated working branch |
-| `feature/*` | Specific metric or dashboard development |
 
 **Versioning approach:**
 
