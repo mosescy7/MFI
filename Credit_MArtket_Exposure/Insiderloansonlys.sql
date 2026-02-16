@@ -1,37 +1,4 @@
-/* ===============================================================
-   INSIDER LOANS – CONTRACT LEVEL EXTRACTION
-   ---------------------------------------------------------------
-   Purpose:
-   Extract insider lending exposure at contract level for
-   Deposit-Taking Microfinance Institutions (DTMFIs).
-
-   This dataset supports:
-     • Insider Lending Report
-     • PNR09 (Related Party Exposure to Tier 1 Capital)
-     • Credit Concentration Monitoring
-     • Gender-based analysis
-     • Performance class monitoring of insider loans
-
-   Granularity:
-     One row per:
-        - LE_BOOK
-        - YEAR_MONTH
-        - CONTRACT_ID
-        - Performance Class
-        - Related Party Category
-
-   Time Scope:
-     Rolling 12 months (dynamic window)
-
-   Source Tables:
-     vision.contracts_expanded
-     vision.contract_loans
-     vision.customers_expanded
-
-   Regulatory Reference:
-     Regulation No 60/2023 – Prudential norms for DTMFIs
-================================================================ */
-
+/* Insider loans only */
 SELECT 
 
     /* Institution identifier (Microfinance LE_BOOK code) */
@@ -48,7 +15,6 @@ SELECT
     cu.relationship_type_desc,
 
     /* Related party category code
-       STAFF, DIR, MGT, PRN, OTH1, OTH2, OTH3 */
     cu.related_party,
 
     /* Gender of borrower for gender-based concentration analysis */
@@ -98,15 +64,20 @@ WHERE
 
     /* Restrict to insider-related categories only */
     cu.related_party IN (
-        'STAFF',     -- Staff members 
-        'DIR',       -- Directors
-        'MGT',       -- Management
-        'PRN',       -- Principal shareholders
-        'OTH1',      -- Other related category 1
-        'OTH2',      -- Other related category 2
-        'OTH3'       -- Other related category 3
-    )
+        'DIR',      
+        'MGT',    
+        'PRN',       
+        'STAFF'      
 
+    )
+AND
+    /*RELATIONSHIP TYPE THAT ARE INSIDER LOAN*/
+    cu.relationship_type_desc IN (
+        'Spouse',
+        'Husband',
+        'Wife',
+        'Self'
+    )
 
 AND
 
@@ -138,5 +109,4 @@ ORDER BY
 
     /* Sorted for reporting consistency and easier validation */
     cl.le_book,
-    cl.year_month,
-    ce.contract_id;
+    cl.year_month;

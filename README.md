@@ -23,25 +23,33 @@ This repository supports the automation of MFSD frequently used output reports a
 
 ```
 EDW queries/
-├── ALL_EDWH_TABLES.sql                          # Schema discovery utility
+├── ALL_EDWH_TABLES.sql                              # Schema discovery utility
 ├── README.md
+├── Documentation/
+│   ├── MFSD Output reports and dashboards v2.0.xlsx # Dashboard output specifications
+│   └── Request for support_EDW data visualization v1.0.docx
 ├── Capital Adequacy/
-│   ├── capital_ar_query.sql                     # CAR line-item breakdown (companies)
-│   └── Sacco Capital(equity to assets.sql       # CAR equity-to-assets ratio (SACCOs)
+│   ├── capital_ar_query.sql                         # CAR line-item breakdown (companies)
+│   └── Sacco Capital(equity to assets.sql           # CAR equity-to-assets ratio (SACCOs)
 ├── Credit_MArtket_Exposure/
-│   ├── capital_ar_pivot.Rmd                     # R notebook: CAR data pivot & analysis
-│   ├── Insider Loans.sql                        # Loans to related parties / insiders
-│   └── Single borrower.sql                      # Single borrower credit exposure
+│   ├── capital_ar_pivot.Rmd                         # R notebook: CAR data pivot & analysis
+│   ├── Insider Loans.sql                            # All related party & insider loans
+│   ├── Insiderloansonlys.sql                        # Insider loans only (strict filter)
+│   ├── RelatedPartyonly.sql                         # Related party loans (broad filter)
+│   ├── Single borrower.sql                          # Single borrower credit exposure
+│   └── Top deposits.sql                             # Top deposit concentration
 ├── Liquidity/
-│   ├── Loan overdraft and customers.sql         # Loan & overdraft balances by FRL attribute
-│   └── top depositors for companies and saccos.sql  # Top depositors by customer
+│   ├── Loan overdraft and customers.sql             # Loan & overdraft balances by FRL attribute
+│   ├── top depositors for companies and saccos.sql  # Top depositors by customer
+│   └── top diposits over the total deposits.sql     # Deposit concentration (top-N analysis)
 └── Other Predential Norms/
-    ├── Borrowings.sql                           # Total borrowings by entity
-    ├── Investment_in_fixed_assets.sql           # Fixed assets (excl. land & buildings)
-    ├── Investment in equity shares.sql          # Equity share investments
-    ├── Landandbuildings.sql                     # Land and buildings book value
-    ├── Non_earning assets.sql                   # Non-earning / non-income assets
-    └── Placements limits.sql                    # Interbank/placement balances
+    ├── Borrowings.sql                               # Total borrowings by entity
+    ├── Investment_in_fixed_assets.sql               # Fixed assets (excl. land & buildings)
+    ├── Investment in equity shares.sql              # Equity share investments
+    ├── Landandbuildings.sql                         # Land and buildings book value
+    ├── Non_earning assets.sql                       # Non-earning / non-income assets
+    ├── Placements limits.sql                        # Interbank/placement balances
+    └── Prudential_norms_consolidated.sql            # All 6 norms in a single query
 ```
 
 ---
@@ -173,10 +181,25 @@ Computes equity-to-assets ratio components for SACCOs (LE_Book 500–999). Aggre
 ### Credit & Market Exposure
 
 #### `Credit_MArtket_Exposure/Insider Loans.sql`
-Tracks loans extended to **related parties** (staff, directors, management, principals) over the last 12 rolling months. Supports **PNR09** and **PNR10**.
+Tracks loans extended to **all related parties** (staff, directors, management, principals, and other connected parties) over the last 12 rolling months. Supports **PNR09** and **PNR10**.
 
 **Filters:** Related party types (`STAFF`, `DIR`, `MGT`, `PRN`, `OTH1–OTH3`), LE_BOOK 400–999
 **Key columns:** `LE_BOOK`, `YEAR_MONTH`, `CONTRACT_ID`, `RELATED_PARTY`, `CUSTOMER_GENDER`, `PERFORMANCE_CLASS`, `DISBURSED_AMOUNT`, `INSIDER_LOANS_LCY`
+**Source tables:** `VISION.CONTRACTS_EXPANDED`, `VISION.CONTRACT_LOANS`, `VISION.CUSTOMERS_EXPANDED`
+
+#### `Credit_MArtket_Exposure/Insiderloansonlys.sql`
+Stricter subset of insider loans — only **direct insider relationships**. Supports **PNR10** (Insider Loans Ratio, max 2% of core capital).
+
+**Related party filter:** `DIR`, `MGT`, `PRN`, `STAFF`
+**Relationship filter:** `Spouse`, `Husband`, `Wife`, `Self`
+**Key columns:** `LE_BOOK`, `YEAR_MONTH`, `RELATIONSHIP_TYPE_DESC`, `RELATED_PARTY`, `CUSTOMER_GENDER`, `PERFORMANCE_CLASS`, `DISBURSED_AMOUNT`, `INSIDER_LOANS_LCY`
+**Source tables:** `VISION.CONTRACTS_EXPANDED`, `VISION.CONTRACT_LOANS`, `VISION.CUSTOMERS_EXPANDED`
+
+#### `Credit_MArtket_Exposure/RelatedPartyonly.sql`
+Comprehensive **related party lending** extraction covering all insider categories and extended family relationships. Supports **PNR09** (Related Party Loans Ratio, max 5% of core capital).
+
+**Related party filter:** `DIR`, `MGT`, `PRN`, `STAFF`, `OTH1`, `OTH2`, `OTH3`
+**Relationship filter (by numeric code):** 1–13 (Spouse, Husband, Wife, Father, Mother, Son, Daughter, Brother, Sister, Grandfather, Grandmother, Grandson, Granddaughter), 23 (Self), 24 (Direct or indirect relationship with the bank)
 **Source tables:** `VISION.CONTRACTS_EXPANDED`, `VISION.CONTRACT_LOANS`, `VISION.CUSTOMERS_EXPANDED`
 
 #### `Credit_MArtket_Exposure/Single borrower.sql`
@@ -199,6 +222,12 @@ R Markdown notebook that connects to EDWH via ODBC, runs the CAR query, and pivo
 Aggregates deposit amounts by customer for institutions (LE_Book 400–999) from January 2023 onward. Filters to deposit account types (`CAA`, `SBA`, `TDA`, `SED`, `TRUSTAC`). Supports **top depositor concentration** analysis and **PNR01** liquidity monitoring.
 
 **Key columns:** `Country`, `LE_Book`, `Year_Month`, `Customer_Id`, `Amount_Lcy`
+**Source tables:** `VISION.FINANCIAL_MONTHLY`, `VISION.Accounts_View`
+
+#### `Liquidity/top diposits over the total deposits.sql`
+Deposit concentration analysis computing **top-N depositor percentages** relative to total deposits. Outputs one row per institution/month with total deposits and top 5/10/20/50 customer amounts and percentages.
+
+**Key columns:** `LE_BOOK`, `YEAR_MONTH`, `TOTAL_DEPOSITS`, `TOP5_AMOUNT`, `TOP5_PCT`, `TOP10_AMOUNT`, `TOP10_PCT`, `TOP20_AMOUNT`, `TOP20_PCT`, `TOP50_AMOUNT`, `TOP50_PCT`
 **Source tables:** `VISION.FINANCIAL_MONTHLY`, `VISION.Accounts_View`
 
 #### `Liquidity/Loan overdraft and customers.sql`
@@ -240,6 +269,12 @@ Monitors **interbank/placement balances** against regulatory limits.
 #### `Other Predential Norms/Investment in equity shares.sql`
 Tracks **investments in equity shares** held by regulated entities.
 **FRL lines:** F1210010, F1210015
+
+#### `Other Predential Norms/Prudential_norms_consolidated.sql`
+**Unified query** replacing the 6 individual prudential norm queries above. Single pass through the data with conditional `CASE` statements to compute all metrics simultaneously.
+
+**Output columns (per LE_BOOK/YEAR_MONTH):** `INVESTMENT_IN_FIXED_ASSETS`, `LAND_AND_BUILDINGS`, `NON_EARNING_ASSETS`, `BORROWINGS`, `PLACEMENT_LIMITS`, `INVESTMENT_IN_EQUITY_SHARES`
+**Advantage:** One query instead of six — reduces database load and simplifies maintenance.
 
 ---
 
@@ -328,9 +363,13 @@ All queries run against the **VISION** schema on an Oracle database. The core ta
 - Core EDWH extraction queries
 - Capital Adequacy logic (CAR, Tier 1 capital filtering)
 - Related party and insider loan exposure logic
+- Separate insider loans query (strict filter: DIR/MGT/PRN/STAFF + Self/Spouse only)
+- Separate related party query (broad filter: all 7 party types + 15 relationship types)
 - Top borrower ranking logic
 - Liquidity queries (top depositors, loan overdraft balances)
+- Deposit concentration analysis (top 5/10/20/50 depositors as % of total)
 - SACCO equity-to-assets ratio
+- Consolidated prudential norms query (6 metrics in a single pass)
 - Date dimension handling for `YEAR_MONTH`
 - Folder structuring aligned to supervisory batches
 
