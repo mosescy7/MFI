@@ -2,7 +2,7 @@
 -- PNR16: BORROWING RATIO
 -- ============================================================================
 -- Purpose:   Total borrowings per LE_Book per month.
---            Ratio = Borrowings / Core Capital * 100 (Max 25%)
+--            Ratio = Borrowings / total assets * 100 (Max 25%)
 --            For SACCOs: use total equity instead of core capital.
 --
 -- Output:    One row per LE_Book / Year_Month with borrowings amount.

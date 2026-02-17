@@ -24,9 +24,11 @@ This repository supports the automation of MFSD frequently used output reports a
 ```
 EDW queries/
 ├── ALL_EDWH_TABLES.sql                              # Schema discovery utility
+├── FRLINEWITHGLTYPE.sql                             # FRL line lookup with GL type descriptions
 ├── README.md
 ├── Documentation/
 │   ├── MFSD Output reports and dashboards v2.0.xlsx # Dashboard output specifications
+│   ├── Prudential Norms Visualization Guide.doc     # PNR13-18 Power BI visualization guide
 │   └── Request for support_EDW data visualization v1.0.docx
 ├── Capital Adequacy/
 │   ├── capital_ar_query.sql                         # CAR line-item breakdown (companies)
@@ -49,7 +51,8 @@ EDW queries/
     ├── Landandbuildings.sql                         # Land and buildings book value
     ├── Non_earning assets.sql                       # Non-earning / non-income assets
     ├── Placements limits.sql                        # Interbank/placement balances
-    └── Prudential_norms_consolidated.sql            # All 6 norms in a single query
+    ├── Prudential_norms_consolidated.sql            # All 6 norms in a single query
+    └── TOTAL_ASSETS.sql                             # Total assets (all asset FRL lines)
 ```
 
 ---

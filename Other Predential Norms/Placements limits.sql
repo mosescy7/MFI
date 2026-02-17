@@ -2,7 +2,7 @@
 -- PNR17: PLACEMENT LIMITS
 -- ============================================================================
 -- Purpose:   Total placements per LE_Book per month.
---            Ratio = Placements / Core Capital * 100 (Max 25%)
+--            Ratio = Placements / total assets * 100 (Max 25%)
 --            For SACCOs: use total equity instead of core capital.
 --            Directive on Article 20.
 --

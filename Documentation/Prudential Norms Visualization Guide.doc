@@ -1,0 +1,381 @@
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; margin: 40px; line-height: 1.5; }
+  h1 { font-size: 18pt; color: #1a237e; border-bottom: 2px solid #1a237e; padding-bottom: 6px; }
+  h2 { font-size: 14pt; color: #283593; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-top: 28px; }
+  h3 { font-size: 12pt; color: #37474f; margin-top: 20px; }
+  h4 { font-size: 11pt; color: #455a64; margin-top: 16px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  th { background-color: #1a237e; color: white; padding: 8px 12px; text-align: left; font-size: 10pt; }
+  td { border: 1px solid #ccc; padding: 6px 12px; font-size: 10pt; }
+  tr:nth-child(even) { background-color: #f5f5f5; }
+  code { font-family: Consolas, monospace; background-color: #f0f0f0; padding: 2px 4px; font-size: 10pt; }
+  pre { background-color: #263238; color: #aed581; padding: 14px; font-family: Consolas, monospace; font-size: 10pt; border-radius: 4px; }
+  .meta { color: #555; font-size: 10pt; margin-bottom: 4px; }
+  .breach { background-color: #ffcdd2; }
+  .warning { background-color: #fff9c4; }
+  .compliant { background-color: #c8e6c9; }
+  ul { margin: 6px 0; }
+  li { margin: 3px 0; }
+  hr { border: none; border-top: 1px solid #ccc; margin: 24px 0; }
+  .color-box { display: inline-block; width: 16px; height: 16px; vertical-align: middle; margin-right: 6px; border: 1px solid #999; }
+</style>
+</head>
+<body>
+
+<h1>Prudential Norms (PNR13&#8211;18) &#8212; Visualization Guide</h1>
+
+<p class="meta"><b>Department:</b> Microfinance Supervision Department (MFSD)</p>
+<p class="meta"><b>Regulatory Reference:</b> Regulation No 60/2023 of 27/03/2023, Articles 16 &amp; 20</p>
+<p class="meta"><b>Data Source:</b> VISION Oracle EDW &#8212; <code>Prudential_norms_consolidated.sql</code></p>
+<p class="meta"><b>Date:</b> February 2026</p>
+
+<hr>
+
+<h2>Overview</h2>
+
+<p>This document provides visualization recommendations for the six Other Prudential Norms (PNR13&#8211;PNR18) monitored for Deposit-Taking Microfinance Institutions (DTMFIs). Each norm has a regulatory threshold that institutions must not exceed.</p>
+
+<h3>Summary of Norms</h3>
+
+<table>
+  <tr><th>PNR</th><th>Indicator</th><th>Denominator</th><th>Threshold</th><th>Applies To</th></tr>
+  <tr><td>PNR13</td><td>Investment in Fixed Assets</td><td>Core Capital</td><td>Max 50%</td><td>MF, DSACCO, USACCO, OSACCO</td></tr>
+  <tr><td>PNR14</td><td>Land &amp; Buildings</td><td>Total Assets</td><td>Max 5%</td><td>MF, DSACCO, USACCO, OSACCO</td></tr>
+  <tr><td>PNR15</td><td>Non-Earning Assets</td><td>Total Assets</td><td>Max 10%</td><td>MF, DSACCO, USACCO, OSACCO</td></tr>
+  <tr><td>PNR16</td><td>Borrowing Ratio</td><td>Total Assets</td><td>Max 25%</td><td>MF, DSACCO, USACCO, OSACCO</td></tr>
+  <tr><td>PNR17</td><td>Placement Limits</td><td>Core Capital</td><td>Max 25%</td><td>MF, DSACCO, USACCO, OSACCO</td></tr>
+  <tr><td>PNR18</td><td>Investment in Equity Shares</td><td>Core Capital</td><td>Max 25%</td><td>MF, DSACCO, USACCO, OSACCO</td></tr>
+</table>
+
+<h3>Data Available from Consolidated Query</h3>
+
+<p>The <code>Prudential_norms_consolidated.sql</code> query returns one row per institution per month with:</p>
+
+<table>
+  <tr><th>Column</th><th>Description</th></tr>
+  <tr><td>LE_Book</td><td>Institution code</td></tr>
+  <tr><td>Year_Month</td><td>Reporting period (YYYYMM)</td></tr>
+  <tr><td>CATEGORY_TYPE</td><td>MF, SACCO, OSACCO, or DSACCO</td></tr>
+  <tr><td>Stakeholder_Name</td><td>Institution name</td></tr>
+  <tr><td>Investment_In_Fixed_Assets</td><td>PNR13 numerator</td></tr>
+  <tr><td>Land_And_Buildings</td><td>PNR14 numerator</td></tr>
+  <tr><td>Non_Earning_Assets</td><td>PNR15 numerator</td></tr>
+  <tr><td>Borrowings</td><td>PNR16 numerator</td></tr>
+  <tr><td>Placement_Limits</td><td>PNR17 numerator</td></tr>
+  <tr><td>Investment_In_Equity_Shares</td><td>PNR18 numerator</td></tr>
+</table>
+
+<p><b>Note:</b> Ratios must be computed in Power BI by joining with CAR data (core capital) and total assets from the Capital Adequacy queries.</p>
+
+<hr>
+
+<h2>Recommended DAX Measures</h2>
+
+<p>These measures should be created in Power BI after joining the consolidated query with the CAR dataset:</p>
+
+<pre>
+PNR13 Ratio = DIVIDE([Investment_In_Fixed_Assets], [Core_Capital], 0) * 100
+PNR14 Ratio = DIVIDE([Land_And_Buildings], [Total_Assets], 0) * 100
+PNR15 Ratio = DIVIDE([Non_Earning_Assets], [Total_Assets], 0) * 100
+PNR16 Ratio = DIVIDE([Borrowings], [Total_Assets], 0) * 100
+PNR17 Ratio = DIVIDE([Placement_Limits], [Core_Capital], 0) * 100
+PNR18 Ratio = DIVIDE([Investment_In_Equity_Shares], [Core_Capital], 0) * 100
+</pre>
+
+<p>Conditional formatting measure (reusable pattern):</p>
+
+<pre>
+PNR13 Status =
+    SWITCH(
+        TRUE(),
+        [PNR13 Ratio] > 50, "Breach",
+        [PNR13 Ratio] > 40, "Warning",
+        "Compliant"
+    )
+</pre>
+
+<hr>
+
+<h2>Dashboard Layout</h2>
+
+<h3>Page 1: Prudential Norms Overview</h3>
+
+<p>This page gives supervisors a single-glance view of all 6 norms across all institutions.</p>
+
+<h4>Top Row &#8212; 6 KPI Cards (one per PNR)</h4>
+
+<p>Each card shows:</p>
+<ul>
+  <li>Metric name (e.g., &#8220;PNR13: Fixed Assets&#8221;)</li>
+  <li>Sector-wide current month average ratio</li>
+  <li>Threshold value</li>
+  <li>Number of institutions in breach</li>
+</ul>
+
+<p><b>Power BI Visual:</b> Card or Multi-row Card<br>
+<b>Conditional Formatting:</b> Green if sector average below threshold, Red if above</p>
+
+<h4>Middle Section &#8212; Compliance Heatmap Matrix</h4>
+
+<p>A matrix table where:</p>
+<ul>
+  <li><b>Rows</b> = Institutions (Stakeholder_Name)</li>
+  <li><b>Columns</b> = PNR13, PNR14, PNR15, PNR16, PNR17, PNR18</li>
+  <li><b>Cell Values</b> = Computed ratio (%)</li>
+  <li><b>Conditional Formatting (background color):</b></li>
+</ul>
+
+<table>
+  <tr><th>Status</th><th>Condition</th><th>Background</th></tr>
+  <tr class="compliant"><td>Compliant</td><td>Ratio below 70% of threshold</td><td>Green</td></tr>
+  <tr class="warning"><td>Warning</td><td>Ratio between 70%&#8211;100% of threshold</td><td>Amber / Yellow</td></tr>
+  <tr class="breach"><td>Breach</td><td>Ratio above threshold</td><td>Red</td></tr>
+</table>
+
+<p><b>Power BI Visual:</b> Matrix<br>
+<b>Slicers:</b> CATEGORY_TYPE, Year_Month</p>
+
+<p>This is the most critical visual &#8212; it lets inspectors immediately spot which institutions are breaching which norms.</p>
+
+<h4>Bottom Row &#8212; Breach Count Bar Chart</h4>
+
+<p>Horizontal bar chart showing the count of institutions in breach per PNR.</p>
+
+<p><b>Power BI Visual:</b> Clustered Bar Chart</p>
+<ul>
+  <li>X-axis: Count of institutions in breach</li>
+  <li>Y-axis: PNR indicator names</li>
+  <li>Conditional color: Red bars</li>
+</ul>
+
+<hr>
+
+<h3>Page 2: Prudential Norms Trends</h3>
+
+<p>This page shows 12-month trends for each norm, allowing supervisors to identify deteriorating institutions before they breach.</p>
+
+<h4>Layout &#8212; 2&#215;3 Grid of Line Charts</h4>
+
+<table>
+  <tr><th>Position</th><th>Chart</th></tr>
+  <tr><td>Top Left</td><td>PNR13: Investment in Fixed Assets &#8212; threshold line at 50%</td></tr>
+  <tr><td>Top Right</td><td>PNR14: Land &amp; Buildings &#8212; threshold line at 5%</td></tr>
+  <tr><td>Middle Left</td><td>PNR15: Non-Earning Assets &#8212; threshold line at 10%</td></tr>
+  <tr><td>Middle Right</td><td>PNR16: Borrowing Ratio &#8212; threshold line at 25%</td></tr>
+  <tr><td>Bottom Left</td><td>PNR17: Placement Limits &#8212; threshold line at 25%</td></tr>
+  <tr><td>Bottom Right</td><td>PNR18: Equity Shares &#8212; threshold line at 25%</td></tr>
+</table>
+
+<p><b>Each Line Chart Configuration:</b></p>
+<ul>
+  <li><b>X-axis:</b> Year_Month (12 months rolling)</li>
+  <li><b>Y-axis:</b> Ratio (%)</li>
+  <li><b>Lines:</b> One line per selected institution (use LE_Book slicer)</li>
+  <li><b>Constant Line:</b> Regulatory threshold (red dashed line)</li>
+  <li><b>Data Labels:</b> On for latest month only</li>
+</ul>
+
+<p><b>Power BI Visual:</b> Line Chart with Constant Line<br>
+<b>Slicers (synced across all 6 charts):</b> CATEGORY_TYPE, LE_Book / Stakeholder_Name</p>
+
+<hr>
+
+<h2>Detailed Visual Specifications per PNR</h2>
+
+<h3>PNR13 &#8212; Investment in Fixed Assets (Max 50% of Core Capital)</h3>
+
+<p><b>Regulation:</b> Article 16 &#8212; Fixed assets shall not exceed 50% of core capital</p>
+
+<p><b>Visual 1: Gauge Chart</b></p>
+<ul>
+  <li>Shows the current month sector-wide average ratio</li>
+  <li class="compliant">Green zone: 0&#8211;35%</li>
+  <li class="warning">Yellow zone: 35&#8211;50%</li>
+  <li class="breach">Red zone: 50%+</li>
+  <li>One gauge per CATEGORY_TYPE (use small multiples or a slicer)</li>
+</ul>
+
+<p><b>Visual 2: Line Chart with Threshold</b></p>
+<ul>
+  <li>X-axis: Year_Month (rolling 12 months)</li>
+  <li>Y-axis: Fixed Assets / Core Capital &#215; 100</li>
+  <li>Constant line at 50% (red, dashed)</li>
+  <li>One line per institution when filtered, or sector average when unfiltered</li>
+  <li>Tooltip: Institution name, absolute amount, ratio</li>
+</ul>
+
+<p><b>Why this matters:</b> Fixed asset accumulation can signal capital misallocation. The 50% limit ensures institutions maintain lending capacity.</p>
+
+<hr>
+
+<h3>PNR14 &#8212; Land &amp; Buildings (Max 5% of Total Assets)</h3>
+
+<p><b>Regulation:</b> Article 16 &#8212; Land and buildings shall not exceed 5% of total assets</p>
+
+<p><b>Visual 1: Horizontal Bar Chart with Threshold Line</b></p>
+<ul>
+  <li>Y-axis: Institutions (Stakeholder_Name), sorted by ratio descending</li>
+  <li>X-axis: Ratio (%)</li>
+  <li>Vertical reference line at 5%</li>
+  <li>Conditional bar color: Green &lt; 3%, Yellow 3&#8211;5%, Red &gt; 5%</li>
+  <li>Show latest month only</li>
+</ul>
+
+<p><b>Visual 2: Heatmap / Matrix with Sparklines</b></p>
+<ul>
+  <li>Rows: Institutions</li>
+  <li>Columns: Months (last 12)</li>
+  <li>Cell values: Ratio with background color (green/yellow/red)</li>
+  <li>Alternative: Use sparklines in cells to show the 12-month trend per institution</li>
+</ul>
+
+<p><b>Why this matters:</b> The 5% limit is strict &#8212; even small changes in land valuations can push institutions over the threshold.</p>
+
+<hr>
+
+<h3>PNR15 &#8212; Non-Earning Assets (Max 10% of Total Assets)</h3>
+
+<p><b>Regulation:</b> Article 16 &#8212; Non-earning assets shall not exceed 10% of total assets</p>
+
+<p><b>Visual 1: Traffic Light Table</b></p>
+<ul>
+  <li>Matrix showing each institution&#8217;s ratio per month</li>
+  <li>Conditional formatting:</li>
+</ul>
+<table>
+  <tr><th>Range</th><th>Color</th></tr>
+  <tr class="compliant"><td>&lt; 7%</td><td>Green</td></tr>
+  <tr class="warning"><td>7&#8211;10%</td><td>Amber</td></tr>
+  <tr class="breach"><td>&gt; 10%</td><td>Red</td></tr>
+</table>
+<p>Most practical for supervisors scanning for breaches across many institutions.</p>
+
+<p><b>Visual 2: Stacked Area Chart (Sector Trend)</b></p>
+<ul>
+  <li>X-axis: Year_Month</li>
+  <li>Y-axis: Average Non-Earning Assets Ratio</li>
+  <li>Areas stacked by CATEGORY_TYPE (MF, SACCO, OSACCO, DSACCO)</li>
+  <li>Threshold line at 10%</li>
+  <li>Shows whether non-earning asset ratios are trending up across the sector</li>
+</ul>
+
+<p><b>Why this matters:</b> High non-earning assets (foreclosed property, suspended interest, etc.) indicate asset quality deterioration. This norm is an early warning of systemic stress.</p>
+
+<hr>
+
+<h3>PNR16 &#8212; Borrowing Ratio (Max 25% of Total Assets)</h3>
+
+<p><b>Regulation:</b> Article 20 &#8212; External borrowings shall not exceed 25% of total assets</p>
+
+<p><b>Visual 1: Clustered Bar Chart</b></p>
+<ul>
+  <li>Y-axis: Institutions</li>
+  <li>X-axis: Borrowing ratio (%)</li>
+  <li>Vertical reference line at 25%</li>
+  <li>Sorted descending by ratio</li>
+  <li>Filter: Latest month</li>
+</ul>
+
+<p><b>Visual 2: Waterfall Chart (Monthly Change)</b></p>
+<ul>
+  <li>Shows how the selected institution&#8217;s borrowings changed month-over-month</li>
+  <li>Green bars for decreases, red bars for increases</li>
+  <li>Useful for institution-level deep dives during inspections</li>
+</ul>
+
+<p><b>Why this matters:</b> Over-reliance on external borrowing increases vulnerability to funding disruptions. The 25% cap ensures deposit-funded stability.</p>
+
+<hr>
+
+<h3>PNR17 &#8212; Placement Limits (Max 25% of Core Capital)</h3>
+
+<p><b>Regulation:</b> Article 20 &#8212; Interbank placements shall not exceed 25% of core capital</p>
+
+<p><b>Visual 1: Scatter Plot</b></p>
+<ul>
+  <li>X-axis: Core Capital (absolute)</li>
+  <li>Y-axis: Placements (absolute)</li>
+  <li>Diagonal line at 25% (y = 0.25x)</li>
+  <li>Points above the line are in breach</li>
+  <li>Bubble size: Absolute placement amount</li>
+  <li>Color by CATEGORY_TYPE</li>
+  <li>Tooltip: Institution name, ratio, amounts</li>
+</ul>
+
+<p><b>Visual 2: Line Chart with Threshold</b></p>
+<ul>
+  <li>Same pattern as PNR13 trend chart</li>
+  <li>Threshold line at 25%</li>
+</ul>
+
+<p><b>Why this matters:</b> Excessive placements with other institutions create concentration and counterparty risk. Monitoring relative to capital ensures proportionality.</p>
+
+<hr>
+
+<h3>PNR18 &#8212; Investment in Equity Shares (Max 25% of Core Capital)</h3>
+
+<p><b>Regulation:</b> Article 20 &#8212; Equity share investments shall not exceed 25% of core capital</p>
+
+<p><b>Visual 1: Ranked Bar Chart</b></p>
+<ul>
+  <li>Institutions ranked by equity investment ratio (descending)</li>
+  <li>25% threshold line</li>
+  <li>Conditional color: Green &lt; 15%, Yellow 15&#8211;25%, Red &gt; 25%</li>
+  <li>Latest month snapshot</li>
+</ul>
+
+<p><b>Visual 2: Donut Chart (Composition)</b></p>
+<ul>
+  <li>For a selected institution, show equity investments as a proportion of core capital</li>
+  <li>Inner ring: Core capital breakdown</li>
+  <li>Outer ring: Equity investment portion</li>
+  <li>Use with a slicer for institution selection</li>
+</ul>
+
+<p><b>Why this matters:</b> Equity investments are illiquid and volatile. The 25% cap prevents microfinance institutions from over-concentrating in market risk.</p>
+
+<hr>
+
+<h2>Color Scheme Recommendations</h2>
+
+<p>For consistency across all visuals:</p>
+
+<table>
+  <tr><th>Status</th><th>Color</th><th>Hex Code</th><th>When to Use</th></tr>
+  <tr><td><span class="color-box" style="background-color:#2E7D32;"></span> Compliant</td><td>Green</td><td>#2E7D32</td><td>Ratio well below threshold (&lt; 70% of limit)</td></tr>
+  <tr><td><span class="color-box" style="background-color:#F9A825;"></span> Warning</td><td>Amber/Yellow</td><td>#F9A825</td><td>Ratio approaching threshold (70&#8211;100% of limit)</td></tr>
+  <tr><td><span class="color-box" style="background-color:#C62828;"></span> Breach</td><td>Red</td><td>#C62828</td><td>Ratio exceeds threshold</td></tr>
+  <tr><td><span class="color-box" style="background-color:#D32F2F;"></span> Threshold Line</td><td>Red (dashed)</td><td>#D32F2F</td><td>Constant reference line on charts</td></tr>
+  <tr><td><span class="color-box" style="background-color:#1565C0;"></span> Sector Average</td><td>Blue</td><td>#1565C0</td><td>Sector-wide average trend line</td></tr>
+</table>
+
+<hr>
+
+<h2>Slicer Configuration</h2>
+
+<p>All pages should include the following synchronized slicers:</p>
+
+<table>
+  <tr><th>Slicer</th><th>Type</th><th>Values</th></tr>
+  <tr><td>CATEGORY_TYPE</td><td>Dropdown / Buttons</td><td>MF, SACCO, OSACCO, DSACCO</td></tr>
+  <tr><td>Year_Month</td><td>Slider / Dropdown</td><td>Rolling 12 months</td></tr>
+  <tr><td>Stakeholder_Name</td><td>Searchable Dropdown</td><td>All institution names</td></tr>
+</table>
+
+<p>Enable <b>cross-filtering</b> between visuals so clicking on one institution highlights it across all charts.</p>
+
+<hr>
+
+<h2>Suggested Titles for Dashboard Pages</h2>
+
+<ul>
+  <li><b>Page 1:</b> &#8220;Prudential Norms Compliance Overview&#8221;</li>
+  <li><b>Page 2:</b> &#8220;Prudential Norms &#8212; 12-Month Trends&#8221;</li>
+  <li><b>Optional Page 3:</b> &#8220;Institution Deep Dive&#8221; (filtered to one institution, showing all 6 ratios with detailed trend and composition)</li>
+</ul>
+
+</body>
+</html>
