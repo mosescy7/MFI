@@ -1,0 +1,29 @@
+{
+  "name": "BNR Official Theme – Extended",
+  "dataColors": [
+    "#753918",
+    "#8A4A2B",
+    "#A15C2F",
+    "#DBA628",
+    "#C9A441",
+    "#AB892C",
+    "#9C8456",
+    "#89724E",
+    "#B8A57A",
+    "#D8CBAA",
+    "#FCF7EA",
+    "#5C5346",
+    "#3A332E",
+    "#231F20"
+  ],
+  "background": "#FCF7EA",
+  "foreground": "#231F20",
+  "tableAccent": "#DBA628",
+  "good": "#DBA628",
+  "neutral": "#AB892C",
+  "bad": "#753918",
+  "maximum": "#753918",
+  "center": "#89724E",
+  "minimum": "#FCF7EA",
+  "null": "#E0E0E0"
+}

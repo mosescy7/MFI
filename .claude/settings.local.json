@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"c:\\\\Users\\\\mcyabukombe\\\\OneDrive - bnrw\\\\Desktop\\\\Financial Health dashboard\\\\EDW queries\" status)",
+      "Bash(git -C \"c:\\\\Users\\\\mcyabukombe\\\\OneDrive - bnrw\\\\Desktop\\\\Financial Health dashboard\\\\EDW queries\" remote -v)",
+      "Bash(where:*)",
+      "Bash(Rscript:*)"
+    ]
+  }
+}

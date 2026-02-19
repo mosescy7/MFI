@@ -1,0 +1,1431 @@
+---
+title: "MFSD Financial Health Dashboard"
+output:
+  flexdashboard::flex_dashboard:
+    logo: null
+    orientation: rows
+    vertical_layout: fill
+    navbar:
+      - title: "BNR – MFSD"
+        align: right
+runtime: shiny
+---
+
+```{css}
+/* ============================================================
+   BNR OFFICIAL THEME
+   Primary:    #753918  (dark maroon)
+   Gold:       #DBA628  (accent / good)
+   Background: #FCF7EA  (cream)
+   Text:       #231F20  (near black)
+   ============================================================ */
+
+body {
+  background-color: #FCF7EA;
+  color: #231F20;
+  font-family: "Calibri", "Segoe UI", sans-serif;
+}
+
+.navbar {
+  background-color: #753918 !important;
+  border-color: #5a2b12 !important;
+}
+
+.navbar-brand, .navbar-nav > li > a {
+  color: #FCF7EA !important;
+}
+
+.navbar-nav > li > a:hover {
+  background-color: #DBA628 !important;
+  color: #231F20 !important;
+}
+
+/* Sidebar */
+.sidebar {
+  background-color: #3A332E;
+  color: #FCF7EA;
+}
+
+.sidebar label, .sidebar .control-label {
+  color: #D8CBAA !important;
+  font-weight: 600;
+}
+
+.sidebar .selectize-input {
+  background-color: #5C5346;
+  color: #FCF7EA;
+  border-color: #DBA628;
+}
+
+/* Value boxes */
+.value-box { border-radius: 6px; }
+.value-box .value-box-value { font-size: 2rem; font-weight: 700; }
+.value-box .value-box-title  { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; }
+
+/* Section headers */
+.chart-title {
+  background-color: #753918;
+  color: #FCF7EA !important;
+  font-weight: 600;
+  padding: 6px 12px;
+}
+
+/* Tab nav */
+.nav-tabs > li.active > a,
+.nav-tabs > li.active > a:focus,
+.nav-tabs > li.active > a:hover {
+  background-color: #DBA628 !important;
+  color: #231F20 !important;
+  border-color: #DBA628;
+  font-weight: 700;
+}
+
+.nav-tabs > li > a:hover {
+  background-color: #C9A441;
+  color: #231F20;
+}
+
+/* KPI cards */
+.kpi-card {
+  background: white;
+  border-left: 5px solid #DBA628;
+  border-radius: 4px;
+  padding: 14px 18px;
+  margin: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.08);
+}
+
+.kpi-card .kpi-value { font-size: 1.8rem; font-weight: 700; color: #753918; }
+.kpi-card .kpi-label { font-size: 0.75rem; color: #5C5346; text-transform: uppercase; letter-spacing: 1px; }
+.kpi-card .kpi-threshold { font-size: 0.8rem; color: #AB892C; margin-top: 4px; }
+
+/* Breach badge */
+.breach   { color: #753918; font-weight: 700; }
+.warning  { color: #AB892C; font-weight: 600; }
+.compliant{ color: #2E7D32; font-weight: 600; }
+
+/* DataTable header */
+table.dataTable thead th {
+  background-color: #753918 !important;
+  color: #FCF7EA !important;
+}
+```
+
+```{r setup, include=FALSE}
+# ============================================================
+# LIBRARIES
+
+# ============================================================
+library(flexdashboard)   # Provides the multi-page dashboard layout structure
+library(shiny)           # Powers the reactive server (inputs ↔ outputs)
+library(DBI)             # Generic R database interface — works with any DB
+library(odbc)            # ODBC driver that connects DBI to Oracle via Windows
+library(dplyr)           # Data wrangling: filter, mutate, group_by, join, etc.
+library(plotly)          # Converts ggplot2/plot_ly charts to interactive HTML
+library(DT)              # Renders R data frames as interactive sortable tables
+library(scales)          # Formats numbers (e.g. comma(1000000) → "1,000,000")
+library(tidyr)           # pivot_longer: reshapes wide data to long for charts
+
+# ============================================================
+# BNR COLOR PALETTE  (from BNR Official Theme – Extended.json)
+# ============================================================
+bnr <- list(
+  primary    = "#753918",   # Dark maroon  – brand primary
+  secondary  = "#DBA628",   # Gold         – accent / good
+  bg         = "#FCF7EA",   # Cream        – background
+  text       = "#231F20",   # Near black   – foreground
+  brown2     = "#8A4A2B",
+  brown3     = "#A15C2F",
+  gold2      = "#C9A441",
+  gold3      = "#AB892C",
+  neutral    = "#9C8456",
+  light      = "#D8CBAA",
+  dark       = "#3A332E",
+  breach     = "#753918",   # Same as primary – signals a breach
+  warning_c  = "#AB892C",   # Gold-brown    – warning zone
+  compliant  = "#2E7D32",   # Green         – compliant
+  null_c     = "#E0E0E0"
+)
+
+# Ordered palette for multi-series charts
+bnr_palette <- c(bnr$primary, bnr$secondary, bnr$brown2,
+                 bnr$gold2, bnr$brown3, bnr$neutral,
+                 bnr$light, bnr$dark)
+
+# ============================================================
+# DATABASE CONNECTION
+# ============================================================
+# tryCatch() attempts the connection; if it fails (e.g. 
+# off the BNR network, or credentials are wrong)  NOT crash —
+# returns NULL and the dashboard loads with synthetic sample data.
+#
+# Start → ODBC Data Sources (64-bit)
+# and points to: 172.16.1.17:1521/dwhprddb.bnr.rw
+#
+# UID / PWD are read from environment variables so credentials are
+# never hard-coded in this file. Set them before launching:
+# To connect WITHOUT a DSN (direct IP), replace DSN="EDWH" with:
+#   Driver = "Oracle in OraClient19Home1",
+#   DBQ    = "172.16.1.17:1521/dwhprddb.bnr.rw"
+# ============================================================
+con <- tryCatch({
+  dbConnect(
+    odbc(),
+    DSN      = "EDWH",                      # Windows ODBC shortcut to Oracle EDW
+    UID      = Sys.getenv("EDWH_USER"),
+    PWD      = Sys.getenv("EDWH_PWD"),
+    timeout  = 30                            # seconds before giving up
+  )
+}, error = function(e) {
+  message("DB connection failed – using sample data. Error: ", e$message)
+  NULL   # con = NULL triggers the synthetic data branch below
+})
+
+# ============================================================
+# HELPER: read and execute a SQL file
+# ============================================================
+# This function lets us keep SQL in separate .sql files (cleaner)
+# instead of embedding long SQL strings inside this R file.
+# Steps:
+#   1. readLines()     → reads the .sql file line by line into a vector
+#   2. paste(collapse) → joins all lines back into one SQL string
+#   3. dbGetQuery()    → sends that SQL to Oracle and returns a data frame
+# ============================================================
+run_sql <- function(con, path) {
+  sql <- paste(readLines(path, warn = FALSE), collapse = "\n")
+  dbGetQuery(con, sql)
+}
+
+# ============================================================
+# SQL FILE PATHS
+# ============================================================
+# Paths are relative to this file's location (Random/).
+# "../" means "go up one folder" — so "../Capital Adequacy/..."
+# resolves to the Capital Adequacy folder next to Random/.
+# Storing paths in a named list means changing a file location
+# only requires updating it here, not throughout the code.
+# ============================================================
+path <- list(
+  lebook        = "../Random/ALL_LEBOOK_CATEGORY_AND_DESCRIPTIONS.sql",
+  car_query     = "../Capital Adequacy/capital_ar_query.sql",
+  sacco_cap     = "../Capital Adequacy/Sacco Capital(equity to assets.sql",
+  single_borrow = "../Credit_MArtket_Exposure/Single borrower.sql",
+  insider_loans = "../Credit_MArtket_Exposure/Insider Loans.sql",
+  related_party = "../Credit_MArtket_Exposure/RelatedPartyonly.sql",
+  top_dep_pct   = "../Liquidity/top diposits over the total deposits.sql",
+  top_dep       = "../Liquidity/top depositors for companies and saccos.sql",
+  pnr_consol    = "../Other Predential Norms/Prudential_norms_consolidated.sql",
+  total_assets  = "../Other Predential Norms/TOTAL_ASSETS.sql"
+)
+
+# ============================================================
+# DATA LOADING
+# ============================================================
+le_books   <- paste0(4, sprintf("%02d", 1:20))
+yr_months  <- format(
+  seq(as.Date("2024-03-01"), by = "month", length.out = 12),
+  "%Y%m"
+)
+categories <- c("MF", "SACCO", "OSACCO", "DSACCO")
+
+inst_names <- c(
+  # ---- Microfinance Institutions ----
+  "Inkingi Microfinance",
+  "Amasezerano Community Banking PLC",
+  "VisionFund Rwanda PLC",
+  "Sager Ganza Microfinance PLC",
+  "COPEDU PLC",
+  "Duterimbere IMF PLC",
+  "Atlantis",
+  "Letshego Rwanda PLC",
+  "SMGF",
+  "Goshen Finance PLC",
+  "RIM PLC",
+  "CAF Isonga",
+  "Financial Safety Company Ltd",
+  "Preferred Microfinance LTD",
+  "ASA Microfinance Rwanda PLC",
+  "Clecam Ejo Heza PLC",
+  "Umutanguha Finance Company PLC",
+  "TRUST CAPITAL-KIRA MICROFINANCE PLC",
+  "Inkunga Finance PLC",
+  "UMURIMO FINANCE PLC",
+  "JALI SC PLC",
+  "BRAC Rwanda Microfinance PLC",
+  "Atlantique Microfinance PLC",
+  "AB Rwanda PLC",
+  "URWEGO FINANCE CBC",
+  "LOLC UNGUKA FINANCE PLC",
+  "CHIC FINANCE PLC",
+  
+  # ---- SACCOs ----
+  "HOPE SACCO MUHIMA",
+  "KIGALI SACCO",
+  "EJOHEZA SACCO",
+  "ICYIZERE SACCO GITEGA",
+  "SACCO MAGERAGERE ICYEREKEZO",
+  "INDATWA SACCO KANYINYA",
+  "KUNGAHARA SACCO NYAKABANDA",
+  "URUGWIRO SACCO",
+  "DEVELOPMENT VISION SACCO",
+  "TRUST SACCO NYAMIRAMBO",
+  "GATSATA SACCO AMIZERO",
+  "GIKOMERO SACCO(KOPEKUKUGI)",
+  "GISOZI SACCO",
+  "SACCO ICYEREKEZO KINYINYA",
+  "IJABO REMERA SACCO",
+  "INDATSIKIRA SACCO KIMIHURURA",
+  "JABANA SACCO",
+  "UMUNARA SACCO JALI",
+  "KACYIRU SACCO",
+  "HOME BASKET SACCO KIMIRONKO",
+  "Koperative Zigama Gurinzwa NDUBA",
+  "RUSORORO SACCO",
+  "SACCO RUTUNGA",
+  "ZAMUKA BUMBOGO SACCO",
+  "NDERA SACCO",
+  "KANOMBE SACCO",
+  "IMBONEZA SACCO",
+  "ABAHIZI SACCO",
+  "IJABO SACCO KIGARAMA",
+  "IJABO SACCO KICUKIRO",
+  "VISION SACCO GAHANGA (VISAGA)",
+  "ICYEREKEZO MASAKA SACCO",
+  "GATENGA SACCO",
+  "KAGARAMA SAVINGS AND CREDIT COOPERATIVE",
+  "INDAHIGWA SACCO NIBOYE",
+  "TWIYUBAKE GASHORA SACCO",
+  "ZAMUKA JURU SACCO",
+  "KAMABUYE SACCO",
+  "JYAMBERE MAREBA SACCO",
+  "MAYANGE SACCO",
+  "IMBARUTSO MUSENYI SACCO",
+  "MWOGO SACCO",
+  "IJABO NGERUKA SACCO",
+  "NTARAMA SACCO",
+  "NYAMATA SACCO",
+  "ICYEREKEZO NYARUGENGE SACCO",
+  "RILIMA SACCO",
+  "RUHUHA DEVELOPMENT SACCO",
+  "RWERU SACCO",
+  "SHYARA SACCO",
+  "IMBONI KIGABIRO SACCO",
+  "IMBADUKO MUHAZI SACCO",
+  "ICYEREKEZO GISHARI SACCO",
+  "MUNYIGINYA SACCO",
+  "IMPORE MWULIRE SACCO",
+  "UMUSARE SACCO-MUSHA",
+  "SANGWA SACCO GAHENGERI",
+  "FUMBWE SACCO",
+  "UMUGISHA SACCO MUYUMBU",
+  "COOPEC UBUMWE BWA NYAKARIRO",
+  "GWIZA KARENGE SACCO",
+  "IZIGAMIRE NZIGE SACCO",
+  "IZERE RUBONA SACCO",
+  "TWIYUBAKE MUNYAGA SACCO",
+  "GAHINI SACCO",
+  "KOPERATIVE KUNGAHARA KABARE",
+  "SACCO DUKIRE KABARONDO",
+  "SACCO ICYOGERE MUKARANGE",
+  "DUKIRE SACCO",
+  "SACCOMURUNDI",
+  "MWILI SACCO",
+  "SACCO DUKIRE NDEGO",
+  "COOPEC ABANZUMUGAYO",
+  "SACCO UMUCYO RUKARA",
+  "SACCO RURAMIRA ICYEREKEZO",
+  "SACCO TWIFATANYE RWINWAVU",
+  "KOPERATIVE ABIZERANYE YI GASHANDA(KOPABIGA)",
+  "AMEREKEZO JARAMA SACCO",
+  "COOPERATIVE IMENA ZA KAREMBO",
+  "KAZO SAVING AND CREDIT COOPERATIVE",
+  "KOPERATIVE ZIGAMA KIBUNGO",
+  "IBYIZA MUGESERA SACCO",
+  "KOTIMU",
+  "SACCO INGOBOKA MUTENDERI",
+  "REMERA PEOPLE SAVING AND CREDIT COOPERATIVE",
+  "KUNGAHARA RUKIRA SACCO",
+  "ZIGAMA INTERA RUKUMBELI",
+  "RURENGE PEOPLE SACCO (RP SACCO)",
+  "KOPERATIVE ZIGAMA ISANGE MURI SAKE(KOZISA)",
+  "SACCO NTUSIGARE(KOZINTU)",
+  "JYAMBERE GAHARA",
+  "VISION SACCO GATORE",
+  "IMIRASIRE YITERAMBERE SACCO KIGARAMA",
+  "KIGINA SACCO",
+  "SACCO RUGERO",
+  "SACCO IMBERE HEZA MAHAMA"
+)
+
+make_sample <- function(n = 200) {
+  data.frame(
+    le_book       = sample(le_books, n, replace = TRUE),
+    year_month    = sample(yr_months, n, replace = TRUE),
+    category_type = sample(categories, n, replace = TRUE),
+    stringsAsFactors = FALSE
+  )
+}
+
+# if con is a live connection → run real SQL against Oracle EDW
+# if con is NULL (connection failed) → jump to the else branch below
+if (!is.null(con)) {
+  # ---- Live database queries ----
+  # Each tryCatch wraps one query individually: if ONE query fails
+  # (e.g. missing permissions on that table) the others still load.
+  # A failed query returns NULL; charts gracefully show "No data".
+  df_lebook <- tryCatch(run_sql(con, path$lebook),       error = function(e) NULL)  # LE_Book name/category lookup
+  df_car    <- tryCatch(run_sql(con, path$car_query),    error = function(e) NULL)  # Capital Adequacy Ratio components
+  df_sacco  <- tryCatch(run_sql(con, path$sacco_cap),    error = function(e) NULL)  # SACCO equity-to-assets
+  df_sb     <- tryCatch(run_sql(con, path$single_borrow),error = function(e) NULL)  # Top-20 single borrowers
+  df_ins    <- tryCatch(run_sql(con, path$insider_loans),error = function(e) NULL)  # Insider/related-party loans
+  df_rp     <- tryCatch(run_sql(con, path$related_party),error = function(e) NULL)  # Related party (broader)
+  df_dep    <- tryCatch(run_sql(con, path$top_dep_pct),  error = function(e) NULL)  # Deposit concentration %
+  df_dep_r  <- tryCatch(run_sql(con, path$top_dep),      error = function(e) NULL)  # Top depositor amounts
+  df_pnr    <- tryCatch(run_sql(con, path$pnr_consol),   error = function(e) NULL)  # PNR13–18 balances
+  df_ta     <- tryCatch(run_sql(con, path$total_assets), error = function(e) NULL)  # Total assets (denominator)
+} else {
+  # ---- Synthetic sample data (development mode) ----
+  # This branch runs when there is no database connection
+  # (e.g. working from home, testing, or no Oracle client installed).
+  # set.seed(42) makes the random data reproducible — same numbers
+  # every time so charts look consistent during development.
+  set.seed(42)
+
+  # LE_Book lookup table (mirrors ALL_LEBOOK_CATEGORY_AND_DESCRIPTIONS.sql)
+  df_lebook <- data.frame(
+    le_book              = le_books,
+    leb_description      = inst_names,
+    leb_short_description= substr(inst_names, 1, 12),
+    category_type        = sample(categories, length(le_books), replace = TRUE),
+    leb_status           = "A",
+    stringsAsFactors     = FALSE
+  )
+
+  df_car <- make_sample(300) %>%
+    mutate(
+      car_line_code_desc = sample(c("Tier 1 Capital","Total Capital","RWA"), 300, TRUE),
+      value_lcy = runif(300, 1e7, 5e9)
+    )
+
+  df_sacco <- make_sample(200) %>%
+    mutate(
+      gl_type    = sample(c(10, 20, 30), 200, replace = TRUE),
+      amount_lcy = runif(200, 1e6, 1e9)
+    )
+
+  df_sb <- make_sample(500) %>%
+    mutate(
+      customer_id        = paste0("CUST", sample(1000:9999, 500, TRUE)),
+      customer_name      = paste("Borrower", sample(1:200, 500, TRUE)),
+      borrower_exposure  = runif(500, 1e5, 5e8),
+      performance_status = sample(c("NPL","PL"), 500, TRUE, prob = c(0.2, 0.8)),
+      rnk                = sample(1:20, 500, TRUE)
+    )
+
+  df_ins <- make_sample(400) %>%
+    mutate(
+      relationship_type_desc = sample(c("Self","Spouse","Husband","Wife"), 400, TRUE),
+      related_party          = sample(c("DIR","MGT","PRN","STAFF"), 400, TRUE),
+      customer_gender        = sample(c("M","F"), 400, TRUE),
+      performance_class      = sample(c("NL","WL","SL","DL","LL"), 400, TRUE),
+      disbursed_amount       = runif(400, 1e5, 5e7),
+      insider_loans_lcy      = runif(400, 1e5, 5e7)
+    )
+
+  df_rp <- df_ins
+
+  df_dep <- make_sample(200) %>%
+    mutate(
+      Total_Deposits = runif(200, 1e8, 5e10),
+      Top5_Amount    = Total_Deposits * runif(200, 0.10, 0.40),
+      Top10_Amount   = Total_Deposits * runif(200, 0.20, 0.55),
+      Top20_Amount   = Total_Deposits * runif(200, 0.30, 0.65),
+      Top50_Amount   = Total_Deposits * runif(200, 0.50, 0.85),
+      Top5_Pct       = Top5_Amount  / Total_Deposits * 100,
+      Top10_Pct      = Top10_Amount / Total_Deposits * 100,
+      Top20_Pct      = Top20_Amount / Total_Deposits * 100,
+      Top50_Pct      = Top50_Amount / Total_Deposits * 100
+    )
+
+  df_dep_r <- make_sample(500) %>%
+    mutate(
+      Country     = "RW",
+      customer_id = paste0("C", sample(1000:9999, 500, TRUE)),
+      amount_lcy  = runif(500, 1e5, 5e8)
+    )
+
+  df_pnr <- make_sample(240) %>%
+    mutate(
+      investment_in_fixed_assets  = runif(240, 1e6, 8e8),
+      land_and_buildings          = runif(240, 1e5, 3e8),
+      non_earning_assets          = runif(240, 1e6, 5e8),
+      borrowings                  = runif(240, 1e7, 2e9),
+      placement_limits            = runif(240, 1e5, 5e7),
+      investment_in_equity_shares = runif(240, 1e5, 1e8)
+    )
+
+  df_ta <- make_sample(240) %>%
+    mutate(
+      year         = substr(year_month, 1, 4),
+      total_assets = runif(240, 1e9, 1e11)
+    )
+}
+
+# ============================================================
+# STANDARDISE column names to lowercase
+# ============================================================
+# Oracle returns column names in UPPERCASE (e.g. LE_BOOK, YEAR_MONTH).
+# R is case-sensitive, so LE_BOOK ≠ le_book.
+# Converting everything to lowercase means we can always write
+# df$le_book, df$year_month, etc. without worrying about Oracle's case.
+# ============================================================
+std_names <- function(df) {
+  if (is.null(df)) return(NULL)   # safe guard: skip if query returned nothing
+  names(df) <- tolower(names(df)) # YEAR_MONTH → year_month, LE_BOOK → le_book
+  df
+}
+
+df_lebook <- std_names(df_lebook)
+df_car    <- std_names(df_car)
+df_sacco  <- std_names(df_sacco)
+df_sb     <- std_names(df_sb)
+df_ins    <- std_names(df_ins)
+df_rp     <- std_names(df_rp)
+df_dep    <- std_names(df_dep)
+df_dep_r  <- std_names(df_dep_r)
+df_pnr    <- std_names(df_pnr)
+df_ta     <- std_names(df_ta)
+
+# ============================================================
+# JOIN LEB_DESCRIPTION + CATEGORY_TYPE FROM LE_BOOK LOOKUP
+# ============================================================
+# Every query returns LE_BOOK (a numeric code like "401").
+# This join enriches ALL data frames with the human-readable name
+# (e.g. "Urwego Bank") and the authoritative CATEGORY_TYPE from
+# VISION.LE_BOOK — the single source of truth for institution metadata.
+#
+# left_join: keeps ALL rows from the left (main) data frame and
+#   attaches matching columns from df_lebook on the le_book key.
+#   If no match is found, leb_description will be NA (handled by coalesce).
+#
+# suffix = c("", "_lb"): if both data frames have "category_type",
+#   the lebook version gets renamed to "category_type_lb" to avoid clash.
+#
+# coalesce(a, b): returns 'a' if not NA, otherwise falls back to 'b'.
+#   So we prefer the lebook lookup value; fall back to the query's own value.
+# ============================================================
+join_lebook <- function(df) {
+  if (is.null(df) || is.null(df_lebook) || !"le_book" %in% names(df)) return(df)
+  lkp <- df_lebook %>% select(le_book, leb_description, category_type)
+  df %>%
+    left_join(lkp, by = "le_book", suffix = c("", "_lb")) %>%
+    mutate(category_type = coalesce(category_type_lb, category_type)) %>%
+    select(-any_of("category_type_lb"))  # remove the temporary _lb column
+}
+
+# Apply the join to every data frame that contains le_book
+df_car    <- join_lebook(df_car)
+df_sacco  <- join_lebook(df_sacco)
+df_sb     <- join_lebook(df_sb)
+df_ins    <- join_lebook(df_ins)
+df_rp     <- join_lebook(df_rp)
+df_dep    <- join_lebook(df_dep)
+df_dep_r  <- join_lebook(df_dep_r)
+df_pnr    <- join_lebook(df_pnr)
+df_ta     <- join_lebook(df_ta)
+
+# ============================================================
+# HELPER: BNR plotly layout defaults
+# ============================================================
+# Every chart calls bnr_layout() at the end to apply consistent
+# BNR branding. Without it each chart would use plotly's default
+# white/blue theme. Centralising it here means one edit changes
+# the look of all charts at once.
+#   p          = the plotly object to style
+#   title/xlab/ylab = axis and chart title labels
+# ============================================================
+bnr_layout <- function(p, title = "", xlab = "", ylab = "") {
+  p %>% layout(
+    title  = list(text = title, font = list(color = bnr$primary, size = 14, family = "Calibri")),
+    xaxis  = list(title = xlab, color = bnr$text, gridcolor = "#E8E0D0"),
+    yaxis  = list(title = ylab, color = bnr$text, gridcolor = "#E8E0D0"),
+    paper_bgcolor = bnr$bg,        # outer background (around the plot)
+    plot_bgcolor  = "#FFFEF8",     # inner plot area background
+    font   = list(color = bnr$text, family = "Calibri"),
+    legend = list(bgcolor = "rgba(252,247,234,0.8)", bordercolor = bnr$light)
+  )
+}
+
+# rwf_m(): formats a raw number into "RWF 1,234.5M" for value boxes.
+# Divides by 1e6 (one million) and adds comma separators.
+rwf_m <- function(x) paste0("RWF ", format(round(x / 1e6, 1), big.mark = ","), "M")
+```
+
+Sidebar {.sidebar}
+================================================================================
+
+```{r sidebar}
+# ============================================================
+# GLOBAL FILTERS
+# ============================================================
+# selectInput() creates a dropdown in the sidebar. The "input ID"
+# (first argument, e.g. "cat_type") is how we read the user's
+# selection later in charts: input$cat_type, input$le_book, etc.
+# These inputs are REACTIVE — any chart that reads them automatically
+# re-runs whenever the user changes a selection.
+# ============================================================
+hr()
+h4("Filters", style = "color:#DBA628; font-weight:700; margin-top:0;")
+
+# Dropdown 1: Filter by institution category (MF, SACCO, etc.)
+# "All" means no category filter is applied.
+selectInput(
+  "cat_type", "Institution Type",
+  choices  = c("All", "MF", "SACCO", "OSACCO", "DSACCO"),
+  selected = "All"
+)
+
+# Dropdown 2: Filter by individual institution.
+# setNames(values, labels): the LABEL shown in the dropdown is LEB_DESCRIPTION
+# (e.g. "Urwego Bank") but the VALUE passed to input$le_book is the le_book
+# code (e.g. "401") — this keeps filtering logic simple and unambiguous.
+lebook_choices <- if (!is.null(df_lebook) && nrow(df_lebook) > 0) {
+  lkp <- df_lebook %>%
+    filter(!is.na(leb_description)) %>%
+    arrange(leb_description) %>%         # alphabetical order in dropdown
+    select(le_book, leb_description) %>%
+    distinct()
+  setNames(lkp$le_book, lkp$leb_description)  # name=label, value=le_book code
+} else {
+  # Fallback if lebook lookup failed: show raw le_book codes
+  sort(unique(c(df_pnr$le_book, df_ins$le_book, df_sb$le_book, df_dep$le_book)))
+}
+
+selectInput(
+  "le_book", "Institution",
+  choices  = c("All" = "All", lebook_choices),
+  selected = "All"
+)
+
+# Dropdowns 3 & 4: Date range filter.
+# Year_Month is stored as "YYYYMM" text (e.g. "202401").
+# Collecting from multiple data frames ensures all available months appear.
+all_ym <- sort(unique(c(
+  df_pnr$year_month, df_ins$year_month, df_dep$year_month
+)))
+selectInput("ym_from", "From (YYYYMM)", choices = all_ym, selected = min(all_ym))
+selectInput("ym_to",   "To (YYYYMM)",   choices = all_ym, selected = max(all_ym))
+
+hr()
+p(style = "color:#D8CBAA; font-size:0.75rem;",
+  "All values in Rwanda Francs (LCY).",
+  br(),
+  "Source: VISION Oracle EDW.",
+  br(),
+  "Regulation No 60/2023."
+)
+
+# ---- reactive filter helper ----
+# filter_df() is called at the TOP of every chart and table.
+# It applies the three sidebar selections to any data frame passed to it.
+# Because it reads input$cat_type / input$le_book / input$ym_from / input$ym_to,
+# Shiny automatically re-runs any chart that calls it when a filter changes.
+#
+# cat_col / le_col / ym_col: the actual column names in each data frame.
+# The defaults ("category_type", "le_book", "year_month") cover most cases.
+filter_df <- function(df, cat_col = "category_type",
+                       le_col = "le_book", ym_col = "year_month") {
+  if (is.null(df)) return(NULL)
+  d <- df
+  # Only filter if user didn't select "All", and the column exists
+  if (input$cat_type != "All" && cat_col %in% names(d))
+    d <- d[d[[cat_col]] == input$cat_type, ]
+  if (input$le_book != "All" && le_col %in% names(d))
+    d <- d[d[[le_col]] == input$le_book, ]
+  # Date range: keep rows where year_month falls within the selected window
+  if (ym_col %in% names(d))
+    d <- d[d[[ym_col]] >= input$ym_from & d[[ym_col]] <= input$ym_to, ]
+  d
+}
+```
+
+Overview
+================================================================================
+
+Row {data-height=160}
+--------------------------------------------------------------------------------
+
+### Total Institutions Monitored {.value-box}
+```{r}
+# renderValueBox() creates a KPI tile that re-draws whenever filters change.
+# unique(le_book) counts distinct institutions after applying sidebar filters.
+renderValueBox({
+  n <- length(unique(filter_df(df_pnr)$le_book))
+  valueBox(n, "Institutions", icon = "fa-building", color = bnr$primary)
+})
+```
+
+### Institutions with PNR Breach {.value-box}
+```{r}
+# Counts institution-months where ANY of PNR14, PNR15, or PNR16 exceeds
+# its regulatory limit (5%, 10%, 25% respectively).
+# Requires joining df_pnr with df_ta to compute the ratios
+# (both tables share le_book + year_month as the join key).
+renderValueBox({
+  d  <- filter_df(df_pnr)
+  ta <- filter_df(df_ta)
+  if (!is.null(d) && !is.null(ta) && nrow(d) > 0 && nrow(ta) > 0) {
+    d2 <- d %>%
+      left_join(ta %>% select(le_book, year_month, total_assets),
+                by = c("le_book","year_month")) %>%
+      filter(!is.na(total_assets), total_assets > 0) %>%
+      mutate(
+        pnr14_ratio = land_and_buildings / total_assets * 100,  # limit = 5%
+        pnr15_ratio = non_earning_assets  / total_assets * 100, # limit = 10%
+        pnr16_ratio = borrowings           / total_assets * 100  # limit = 25%
+      )
+    # | means OR — flag the row if ANY ratio is breached
+    n_breach <- nrow(d2[d2$pnr14_ratio > 5 | d2$pnr15_ratio > 10 | d2$pnr16_ratio > 25, ])
+  } else {
+    n_breach <- "–"
+  }
+  valueBox(n_breach, "PNR Breaches", icon = "fa-exclamation-triangle", color = bnr$breach)
+})
+```
+
+### Total Insider Loans Exposure {.value-box}
+```{r}
+renderValueBox({
+  d <- filter_df(df_ins)
+  val <- if (!is.null(d) && nrow(d) > 0 && "insider_loans_lcy" %in% names(d))
+    rwf_m(sum(as.numeric(d$insider_loans_lcy), na.rm = TRUE))
+  else "–"
+  valueBox(val, "Insider Loans (LCY)", icon = "fa-users", color = bnr$secondary)
+})
+```
+
+### Reporting Period {.value-box}
+```{r}
+renderValueBox({
+  valueBox(
+    paste(input$ym_from, "→", input$ym_to),
+    "Reporting Window", icon = "fa-calendar",
+    color = bnr$dark
+  )
+})
+```
+
+Row {data-height=400}
+--------------------------------------------------------------------------------
+
+### PNR Compliance Summary – Latest Month
+
+```{r}
+# This bar chart shows the sector-average ratio for each PNR (PNR13–18)
+# for the most recent month, with a dashed line at the regulatory limit.
+# Bar colour: green = compliant, amber = within 70–100% of limit, red = breach.
+renderPlotly({
+  d  <- filter_df(df_pnr)
+  ta <- filter_df(df_ta)
+  if (is.null(d) || is.null(ta) || nrow(d) == 0) {
+    return(plotly_empty() %>% bnr_layout("No data available"))
+  }
+
+  # max(year_month) picks the most recent period in the filtered data
+  latest <- max(d$year_month)
+  d_l <- d %>%
+    filter(year_month == latest) %>%
+    # Join total assets so we can compute each PNR as % of total assets
+    left_join(ta %>% select(le_book, year_month, total_assets),
+              by = c("le_book","year_month")) %>%
+    filter(!is.na(total_assets), total_assets > 0) %>%
+    # summarise collapses ALL institutions into ONE sector average per PNR
+    summarise(
+      `PNR13 Fixed Assets/Capital (Max 50%)`       = mean(investment_in_fixed_assets / total_assets * 100, na.rm=T),
+      `PNR14 Land & Buildings/Assets (Max 5%)`     = mean(land_and_buildings / total_assets * 100, na.rm=T),
+      `PNR15 Non-Earning Assets/Assets (Max 10%)`  = mean(non_earning_assets  / total_assets * 100, na.rm=T),
+      `PNR16 Borrowings/Assets (Max 25%)`          = mean(borrowings           / total_assets * 100, na.rm=T),
+      `PNR17 Placements/Capital (Max 25%)`         = mean(placement_limits    / total_assets * 100, na.rm=T),
+      `PNR18 Equity Shares/Capital (Max 25%)`      = mean(investment_in_equity_shares / total_assets * 100, na.rm=T)
+    ) %>%
+    # pivot_longer turns the 6 PNR columns into 2 columns: PNR name + Ratio value
+    # This "long" format is what plot_ly needs to draw one bar per PNR
+    tidyr::pivot_longer(everything(), names_to = "PNR", values_to = "Ratio")
+
+  thresholds <- c(50, 5, 10, 25, 25, 25)  # regulatory limits in same order as PNRs
+  d_l$Threshold <- thresholds
+  # Colour logic: >100% of limit = Breach, >70% = Warning, else Compliant
+  d_l$Status <- ifelse(d_l$Ratio > d_l$Threshold, "Breach",
+                       ifelse(d_l$Ratio > d_l$Threshold * 0.7, "Warning", "Compliant"))
+  d_l$Color <- ifelse(d_l$Status == "Breach", bnr$breach,
+                      ifelse(d_l$Status == "Warning", bnr$warning_c, bnr$compliant))
+
+  plot_ly(d_l) %>%
+    add_bars(x = ~PNR, y = ~Ratio, name = "Sector Average",
+             marker = list(color = d_l$Color),           # colour per bar
+             text = ~paste0(round(Ratio,1), "% (limit: ", Threshold, "%)"),
+             hovertemplate = "%{x}<br>%{text}<extra></extra>") %>%
+    add_lines(x = ~PNR, y = ~Threshold, name = "Regulatory Limit",
+              line = list(color = bnr$breach, dash = "dash", width = 2)) %>%  # dashed red limit line
+    bnr_layout("Sector Average PNR Ratios vs Regulatory Limits", ylab = "Ratio (%)")
+})
+```
+
+### Insider Loans by Category
+
+```{r}
+renderPlotly({
+  d <- filter_df(df_ins)
+  if (is.null(d) || nrow(d) == 0) return(plotly_empty())
+
+  d_sum <- d %>%
+    group_by(related_party) %>%
+    summarise(total = sum(as.numeric(insider_loans_lcy), na.rm = TRUE), .groups = "drop")
+
+  plot_ly(d_sum, labels = ~related_party, values = ~total, type = "pie",
+          marker = list(colors = bnr_palette),
+          textinfo = "label+percent",
+          hovertemplate = "%{label}<br>RWF %{value:,.0f}<extra></extra>") %>%
+    bnr_layout("Insider Loan Exposure by Related Party Category")
+})
+```
+
+Capital Adequacy
+================================================================================
+
+Row {data-height=120}
+--------------------------------------------------------------------------------
+
+### Tier 1 Capital Ratio (Min 10%) {.value-box}
+```{r}
+renderValueBox({
+  d <- filter_df(df_car)
+  val <- if (!is.null(d) && "car_line_code_desc" %in% names(d))
+    paste0(round(mean(d$value_lcy[grepl("Tier 1|Core", d$car_line_code_desc, ignore.case=T)], na.rm=T) / 1e6, 0), "M")
+  else "–"
+  valueBox(val, "Tier 1 Capital (Avg LCY)", icon = "fa-shield", color = bnr$primary)
+})
+```
+
+### SACCO Equity-to-Assets {.value-box}
+```{r}
+renderValueBox({
+  d <- filter_df(df_sacco)
+  eq  <- sum(d$amount_lcy[d$gl_type == 30], na.rm = TRUE)
+  ast <- sum(d$amount_lcy[d$gl_type == 10], na.rm = TRUE)
+  val <- if (ast > 0) paste0(round(eq / ast * 100, 1), "%") else "–"
+  valueBox(val, "SACCO Equity / Assets (Min 15%)", icon = "fa-percent", color = bnr$secondary)
+})
+```
+
+Row {data-height=420}
+--------------------------------------------------------------------------------
+
+### CAR Components – Trend by Month
+
+```{r}
+renderPlotly({
+  d <- filter_df(df_car)
+  if (is.null(d) || nrow(d) == 0) return(plotly_empty())
+
+  d_sum <- d %>%
+    group_by(year_month, car_line_code_desc) %>%
+    summarise(value = sum(value_lcy, na.rm = TRUE) / 1e6, .groups = "drop")
+
+  components <- unique(d_sum$car_line_code_desc)
+  colors_map  <- setNames(bnr_palette[seq_along(components)], components)
+
+  p <- plot_ly()
+  for (comp in components) {
+    sub <- d_sum[d_sum$car_line_code_desc == comp, ]
+    p <- p %>% add_lines(
+      data = sub, x = ~year_month, y = ~value,
+      name = comp,
+      line = list(color = colors_map[[comp]], width = 2),
+      hovertemplate = paste0(comp, "<br>%{x}: RWF %{y:,.1f}M<extra></extra>")
+    )
+  }
+  p %>% bnr_layout("CAR Components Over Time (RWF Millions)",
+                   xlab = "Month", ylab = "Value (RWF M)")
+})
+```
+
+### SACCO Equity vs Assets vs Liabilities
+
+```{r}
+renderPlotly({
+  d <- filter_df(df_sacco)
+  if (is.null(d) || nrow(d) == 0) return(plotly_empty())
+
+  d_sum <- d %>%
+    mutate(gl_label = case_when(
+      gl_type == 10 ~ "Assets",
+      gl_type == 20 ~ "Liabilities",
+      gl_type == 30 ~ "Equity",
+      TRUE ~ as.character(gl_type)
+    )) %>%
+    group_by(year_month, gl_label) %>%
+    summarise(amount = sum(amount_lcy, na.rm = TRUE) / 1e6, .groups = "drop")
+
+  gl_colors <- c("Assets" = bnr$primary, "Liabilities" = bnr$brown2, "Equity" = bnr$secondary)
+
+  p <- plot_ly()
+  for (gl in unique(d_sum$gl_label)) {
+    sub <- d_sum[d_sum$gl_label == gl, ]
+    p <- p %>% add_bars(
+      data = sub, x = ~year_month, y = ~amount,
+      name = gl,
+      marker = list(color = gl_colors[[gl]]),
+      hovertemplate = paste0(gl, "<br>%{x}: RWF %{y:,.1f}M<extra></extra>")
+    )
+  }
+  p %>% layout(barmode = "group") %>%
+    bnr_layout("SACCO Balance Sheet Components (RWF M)", xlab="Month", ylab="RWF M")
+})
+```
+
+Row {data-height=320}
+--------------------------------------------------------------------------------
+
+### CAR Data Table
+
+```{r}
+renderDT({
+  d <- filter_df(df_car)
+  if (is.null(d) || nrow(d) == 0) return(datatable(data.frame(Message = "No data")))
+
+  d %>%
+    mutate(value_lcy = scales::comma(round(value_lcy, 0))) %>%
+    arrange(desc(year_month)) %>%
+    select(leb_description, year_month, category_type, car_line_code_desc, value_lcy) %>%
+    datatable(
+      options = list(pageLength = 8, scrollX = TRUE, dom = "frtip",
+                     initComplete = JS("function(s,dt){$(dt.table().header()).css({'background':'#753918','color':'#FCF7EA'});}")),
+      rownames = FALSE,
+      colnames = c("Institution","Year_Month","Type","CAR Component","Value (LCY)")
+    )
+})
+```
+
+Credit & Market Exposure
+================================================================================
+
+Row {data-height=120}
+--------------------------------------------------------------------------------
+
+### Top Borrower (Max Exposure) {.value-box}
+```{r}
+renderValueBox({
+  d <- filter_df(df_sb)
+  val <- if (!is.null(d) && nrow(d) > 0)
+    rwf_m(max(as.numeric(d$borrower_exposure), na.rm = TRUE))
+  else "–"
+  valueBox(val, "Largest Single Borrower Exposure", icon = "fa-user", color = bnr$primary)
+})
+```
+
+### NPL Borrowers {.value-box}
+```{r}
+renderValueBox({
+  d <- filter_df(df_sb)
+  n <- if (!is.null(d) && "performance_status" %in% names(d))
+    sum(d$performance_status == "NPL", na.rm = TRUE)
+  else "–"
+  valueBox(n, "NPL Borrowers in Top 20", icon = "fa-exclamation", color = bnr$breach)
+})
+```
+
+### Related Party Loans Exposure {.value-box}
+```{r}
+renderValueBox({
+  d <- filter_df(df_rp)
+  val <- if (!is.null(d) && "insider_loans_lcy" %in% names(d))
+    rwf_m(sum(as.numeric(d$insider_loans_lcy), na.rm = TRUE))
+  else "–"
+  valueBox(val, "Related Party Exposure (LCY)", icon = "fa-users", color = bnr$secondary)
+})
+```
+
+Row {data-height=400}
+--------------------------------------------------------------------------------
+
+### Top 20 Borrowers – Exposure by Institution
+
+```{r}
+renderPlotly({
+  d <- filter_df(df_sb)
+  if (is.null(d) || nrow(d) == 0) return(plotly_empty())
+
+  latest <- max(d$year_month)
+  d_l <- d %>%
+    filter(year_month == latest) %>%
+    arrange(desc(as.numeric(borrower_exposure))) %>%
+    head(20) %>%
+    mutate(
+      exposure_m  = as.numeric(borrower_exposure) / 1e6,
+      bar_color   = ifelse(performance_status == "NPL", bnr$breach, bnr$secondary),
+      # Display: "Borrower Name (Institution Name)"
+      label       = paste0(customer_name, " (", coalesce(leb_description, le_book), ")")
+    )
+
+  plot_ly(d_l) %>%
+    add_bars(
+      x = ~exposure_m,
+      y = ~reorder(label, exposure_m),
+      orientation = "h",
+      marker = list(color = d_l$bar_color),
+      text  = ~paste0(performance_status, " | RWF ", round(exposure_m,1), "M"),
+      hovertemplate = "%{y}<br>%{text}<extra></extra>"
+    ) %>%
+    bnr_layout(paste("Top 20 Borrowers – Latest Month:", latest),
+               xlab = "Exposure (RWF M)", ylab = "")
+})
+```
+
+### Insider Loans – Trend by Related Party
+
+```{r}
+renderPlotly({
+  d <- filter_df(df_ins)
+  if (is.null(d) || nrow(d) == 0) return(plotly_empty())
+
+  d_sum <- d %>%
+    group_by(year_month, related_party) %>%
+    summarise(total = sum(as.numeric(insider_loans_lcy), na.rm=T) / 1e6, .groups="drop")
+
+  parties    <- unique(d_sum$related_party)
+  colors_map <- setNames(bnr_palette[seq_along(parties)], parties)
+
+  p <- plot_ly()
+  for (party in parties) {
+    sub <- d_sum[d_sum$related_party == party, ]
+    p <- p %>% add_lines(
+      data = sub, x = ~year_month, y = ~total,
+      name = party,
+      line = list(color = colors_map[[party]], width = 2),
+      hovertemplate = paste0(party,"<br>%{x}: RWF %{y:,.1f}M<extra></extra>")
+    )
+  }
+  p %>% bnr_layout("Insider Loan Exposure Trend (RWF M)", xlab = "Month", ylab = "RWF M")
+})
+```
+
+Row {data-height=300}
+--------------------------------------------------------------------------------
+
+### Insider Loans by Gender & Performance Class
+
+```{r}
+renderPlotly({
+  d <- filter_df(df_ins)
+  if (is.null(d) || nrow(d) == 0) return(plotly_empty())
+  d_sum <- d %>%
+    group_by(customer_gender, performance_class) %>%
+    summarise(total = sum(as.numeric(insider_loans_lcy), na.rm=T)/1e6, .groups="drop")
+
+  plot_ly(d_sum, x = ~performance_class, y = ~total, color = ~customer_gender,
+          type = "bar",
+          colors = c("M" = bnr$primary, "F" = bnr$secondary),
+          hovertemplate = "%{x} | %{data.name}<br>RWF %{y:,.1f}M<extra></extra>") %>%
+    layout(barmode = "stack") %>%
+    bnr_layout("Insider Loans by Gender and Performance Class",
+               xlab = "Performance Class", ylab = "RWF M")
+})
+```
+
+### Insider Loans Detail Table
+
+```{r}
+renderDT({
+  d <- filter_df(df_ins)
+  if (is.null(d) || nrow(d) == 0) return(datatable(data.frame(Message="No data")))
+
+  d %>%
+    mutate(insider_loans_lcy = scales::comma(round(as.numeric(insider_loans_lcy),0))) %>%
+    arrange(desc(year_month)) %>%
+    select(leb_description, year_month, category_type, relationship_type_desc,
+           related_party, customer_gender, performance_class, insider_loans_lcy) %>%
+    datatable(
+      options = list(pageLength = 6, scrollX = TRUE, dom = "frtip",
+                     initComplete = JS("function(s,dt){$(dt.table().header()).css({'background':'#753918','color':'#FCF7EA'});}")),
+      rownames = FALSE,
+      colnames = c("Institution","Year_Month","Type","Relationship","Party Type",
+                   "Gender","Performance","Exposure (LCY)")
+    )
+})
+```
+
+Liquidity
+================================================================================
+
+Row {data-height=120}
+--------------------------------------------------------------------------------
+
+### Max Top-5 Concentration {.value-box}
+```{r}
+renderValueBox({
+  d <- filter_df(df_dep)
+  val <- if (!is.null(d) && "top5_pct" %in% names(d))
+    paste0(round(max(d$top5_pct, na.rm=T), 1), "%")
+  else "–"
+  valueBox(val, "Highest Top-5 Deposit Concentration", icon = "fa-database", color = bnr$primary)
+})
+```
+
+### Institutions with Top-5 > 30% {.value-box}
+```{r}
+renderValueBox({
+  d <- filter_df(df_dep)
+  n <- if (!is.null(d) && "top5_pct" %in% names(d))
+    sum(d$top5_pct > 30, na.rm = TRUE)
+  else "–"
+  valueBox(n, "Institutions: Top-5 > 30%", icon = "fa-warning", color = bnr$breach)
+})
+```
+
+### Total Deposits Monitored {.value-box}
+```{r}
+renderValueBox({
+  d <- filter_df(df_dep)
+  val <- if (!is.null(d) && "total_deposits" %in% names(d))
+    rwf_m(sum(d$total_deposits, na.rm=T))
+  else "–"
+  valueBox(val, "Total Deposits (Latest)", icon = "fa-money", color = bnr$secondary)
+})
+```
+
+Row {data-height=420}
+--------------------------------------------------------------------------------
+
+### Deposit Concentration – Top-N vs Total Deposits
+
+```{r}
+renderPlotly({
+  d <- filter_df(df_dep)
+  if (is.null(d) || nrow(d) == 0) return(plotly_empty())
+
+  d_avg <- d %>%
+    group_by(year_month) %>%
+    summarise(
+      `Top 5`  = mean(top5_pct,  na.rm=T),
+      `Top 10` = mean(top10_pct, na.rm=T),
+      `Top 20` = mean(top20_pct, na.rm=T),
+      `Top 50` = mean(top50_pct, na.rm=T),
+      .groups  = "drop"
+    ) %>%
+    tidyr::pivot_longer(-year_month, names_to="Tier", values_to="Pct")
+
+  tier_colors <- c("Top 5"=bnr$breach, "Top 10"=bnr$warning_c,
+                   "Top 20"=bnr$secondary, "Top 50"=bnr$compliant)
+
+  p <- plot_ly()
+  for (tier in unique(d_avg$Tier)) {
+    sub <- d_avg[d_avg$Tier == tier, ]
+    p <- p %>% add_lines(
+      data = sub, x = ~year_month, y = ~Pct,
+      name = tier,
+      line = list(color = tier_colors[[tier]], width = 2.5),
+      hovertemplate = paste0(tier,"<br>%{x}: %{y:.1f}%<extra></extra>")
+    )
+  }
+  p %>% bnr_layout("Avg Deposit Concentration Trend (Sector)",
+                   xlab="Month", ylab="% of Total Deposits")
+})
+```
+
+### Top-5 Concentration by Institution – Latest Month
+
+```{r}
+renderPlotly({
+  d <- filter_df(df_dep)
+  if (is.null(d) || nrow(d) == 0) return(plotly_empty())
+
+  latest <- max(d$year_month)
+  d_l <- d %>%
+    filter(year_month == latest) %>%
+    mutate(
+      inst_label = coalesce(leb_description, le_book),
+      bar_color  = ifelse(top5_pct > 30, bnr$breach,
+                          ifelse(top5_pct > 20, bnr$warning_c, bnr$secondary))
+    ) %>%
+    arrange(desc(top5_pct))
+
+  plot_ly(d_l) %>%
+    add_bars(
+      x = ~top5_pct,
+      y = ~reorder(inst_label, top5_pct),
+      orientation = "h",
+      marker = list(color = d_l$bar_color),
+      text   = ~paste0(round(top5_pct,1), "%"),
+      hovertemplate = "%{y}<br>Top-5: %{text}<extra></extra>"
+    ) %>%
+    add_lines(x = c(30, 30), y = c(-0.5, nrow(d_l)-0.5),
+              name = "30% Warning", line=list(color=bnr$breach, dash="dash")) %>%
+    bnr_layout(paste("Top-5 Deposit Concentration –", latest),
+               xlab = "% of Total Deposits", ylab = "Institution")
+})
+```
+
+Row {data-height=300}
+--------------------------------------------------------------------------------
+
+### Deposit Concentration Detail Table
+
+```{r}
+renderDT({
+  d <- filter_df(df_dep)
+  if (is.null(d) || nrow(d) == 0) return(datatable(data.frame(Message="No data")))
+
+  d %>%
+    mutate(across(c(total_deposits, top5_amount, top10_amount, top20_amount, top50_amount),
+                  ~scales::comma(round(.,0))),
+           across(c(top5_pct, top10_pct, top20_pct, top50_pct),
+                  ~paste0(round(.,1),"%")),
+           inst_label = coalesce(leb_description, le_book)) %>%
+    arrange(desc(year_month)) %>%
+    select(inst_label, year_month, category_type,
+           total_deposits, top5_amount, top10_amount, top20_amount, top50_amount,
+           top5_pct, top10_pct, top20_pct, top50_pct) %>%
+    datatable(
+      options = list(pageLength=6, scrollX=TRUE, dom="frtip",
+                     initComplete = JS("function(s,dt){$(dt.table().header()).css({'background':'#753918','color':'#FCF7EA'});}")),
+      rownames = FALSE,
+      colnames = c("Institution","Year_Month","Type",
+                   "Total Deposits","Top5","Top10","Top20","Top50",
+                   "Top5%","Top10%","Top20%","Top50%")
+    )
+})
+```
+
+Other Prudential Norms
+================================================================================
+
+Row {data-height=120}
+--------------------------------------------------------------------------------
+
+### PNR13 – Fixed Assets {.value-box}
+```{r}
+renderValueBox({
+  d <- filter_df(df_pnr); ta <- filter_df(df_ta); val <- "–"
+  if (!is.null(d) && !is.null(ta) && nrow(d)>0 && nrow(ta)>0) {
+    j <- d %>% left_join(ta %>% select(le_book,year_month,total_assets), by=c("le_book","year_month")) %>%
+      filter(!is.na(total_assets),total_assets>0)
+    val <- paste0(round(mean(j$investment_in_fixed_assets/j$total_assets*100,na.rm=T),1),"%")
+  }
+  valueBox(val, "Fixed Assets/Capital (Max 50%)", icon="fa-industry", color=bnr$primary)
+})
+```
+
+### PNR15 – Non-Earning Assets {.value-box}
+```{r}
+renderValueBox({
+  d <- filter_df(df_pnr); ta <- filter_df(df_ta); val <- "–"
+  if (!is.null(d) && !is.null(ta) && nrow(d)>0 && nrow(ta)>0) {
+    j <- d %>% left_join(ta %>% select(le_book,year_month,total_assets), by=c("le_book","year_month")) %>%
+      filter(!is.na(total_assets),total_assets>0)
+    val <- paste0(round(mean(j$non_earning_assets/j$total_assets*100,na.rm=T),1),"%")
+  }
+  valueBox(val, "Non-Earning/Assets (Max 10%)", icon="fa-minus-circle", color=bnr$breach)
+})
+```
+
+### PNR16 – Borrowings {.value-box}
+```{r}
+renderValueBox({
+  d <- filter_df(df_pnr); ta <- filter_df(df_ta); val <- "–"
+  if (!is.null(d) && !is.null(ta) && nrow(d)>0 && nrow(ta)>0) {
+    j <- d %>% left_join(ta %>% select(le_book,year_month,total_assets), by=c("le_book","year_month")) %>%
+      filter(!is.na(total_assets),total_assets>0)
+    val <- paste0(round(mean(j$borrowings/j$total_assets*100,na.rm=T),1),"%")
+  }
+  valueBox(val, "Borrowings/Assets (Max 25%)", icon="fa-arrow-circle-down", color=bnr$secondary)
+})
+```
+
+### PNR18 – Equity Shares {.value-box}
+```{r}
+renderValueBox({
+  d <- filter_df(df_pnr); ta <- filter_df(df_ta); val <- "–"
+  if (!is.null(d) && !is.null(ta) && nrow(d)>0 && nrow(ta)>0) {
+    j <- d %>% left_join(ta %>% select(le_book,year_month,total_assets), by=c("le_book","year_month")) %>%
+      filter(!is.na(total_assets),total_assets>0)
+    val <- paste0(round(mean(j$investment_in_equity_shares/j$total_assets*100,na.rm=T),1),"%")
+  }
+  valueBox(val, "Equity Shares/Capital (Max 25%)", icon="fa-line-chart", color=bnr$gold3)
+})
+```
+
+Row {data-height=420}
+--------------------------------------------------------------------------------
+
+### PNR13-18 Compliance Heatmap – Latest Month
+
+```{r}
+# Heatmap: rows = institutions, columns = PNR indicators.
+# Each cell colour shows how close that institution is to breaching that limit.
+# Green → compliant, Gold → approaching limit, Maroon → breached.
+renderPlotly({
+  d  <- filter_df(df_pnr)
+  ta <- filter_df(df_ta)
+  if (is.null(d) || is.null(ta) || nrow(d)==0) return(plotly_empty())
+
+  latest <- max(d$year_month)
+  j <- d %>%
+    filter(year_month == latest) %>%
+    left_join(ta %>% select(le_book,year_month,total_assets), by=c("le_book","year_month")) %>%
+    filter(!is.na(total_assets), total_assets > 0) %>%
+    mutate(
+      # Compute each PNR ratio as % of total assets (one row per institution)
+      PNR13 = round(investment_in_fixed_assets  / total_assets * 100, 1),
+      PNR14 = round(land_and_buildings          / total_assets * 100, 1),
+      PNR15 = round(non_earning_assets           / total_assets * 100, 1),
+      PNR16 = round(borrowings                   / total_assets * 100, 1),
+      PNR17 = round(placement_limits             / total_assets * 100, 1),
+      PNR18 = round(investment_in_equity_shares  / total_assets * 100, 1),
+      inst_label = coalesce(leb_description, le_book)  # display name
+    ) %>%
+    arrange(inst_label)  # alphabetical rows in heatmap
+
+  limits   <- c(PNR13=50, PNR14=5, PNR15=10, PNR16=25, PNR17=25, PNR18=25)
+  pnr_cols <- c("PNR13","PNR14","PNR15","PNR16","PNR17","PNR18")
+
+  # Build the colour intensity matrix (z_mat):
+  # Divide each ratio by its limit → gives 0 (0% of limit) to 1.0 (at limit).
+  # pmin(..., 1.5) caps breaches at 1.5 so they show as maximum red, not infinity.
+  # Dividing by 1.5 rescales to 0–1 as required by plotly's colorscale.
+  z_mat <- sapply(pnr_cols, function(col) {
+    pmin(j[[col]] / limits[[col]], 1.5) / 1.5
+  })
+
+  plot_ly(
+    x = pnr_cols,          # columns = PNR indicators
+    y = j$inst_label,      # rows = institution names
+    z = t(z_mat),          # t() transposes: plotly expects z[col, row]
+    type = "heatmap",
+    # colorscale: maps 0→green, 0.5→gold, 1→maroon
+    colorscale = list(
+      list(0,   bnr$compliant),
+      list(0.5, bnr$secondary),
+      list(1,   bnr$breach)
+    ),
+    showscale = FALSE,     # hide the colour legend bar (colours are self-explanatory)
+    # text shown on hover: "actual% / limit%"
+    text = t(sapply(pnr_cols, function(col) paste0(j[[col]], "% / ", limits[[col]], "%"))),
+    hovertemplate = "%{y}<br>%{x}: %{text}<extra></extra>"
+  ) %>%
+    bnr_layout(paste("PNR Compliance Heatmap –", latest),
+               xlab = "PNR Indicator", ylab = "Institution")
+})
+```
+
+### PNR Trends – 12 Months
+
+```{r}
+renderPlotly({
+  d  <- filter_df(df_pnr)
+  ta <- filter_df(df_ta)
+  if (is.null(d) || is.null(ta) || nrow(d)==0) return(plotly_empty())
+
+  j <- d %>%
+    left_join(ta %>% select(le_book,year_month,total_assets), by=c("le_book","year_month")) %>%
+    filter(!is.na(total_assets), total_assets > 0) %>%
+    group_by(year_month) %>%
+    summarise(
+      `PNR14 Land (5%)`         = mean(land_and_buildings/total_assets*100, na.rm=T),
+      `PNR15 Non-Earning (10%)` = mean(non_earning_assets/total_assets*100,  na.rm=T),
+      `PNR16 Borrowings (25%)`  = mean(borrowings/total_assets*100,          na.rm=T),
+      .groups = "drop"
+    ) %>%
+    tidyr::pivot_longer(-year_month, names_to="PNR", values_to="Ratio")
+
+  limits_map  <- c("PNR14 Land (5%)"=5, "PNR15 Non-Earning (10%)"=10, "PNR16 Borrowings (25%)"=25)
+  line_colors <- c("PNR14 Land (5%)"=bnr$primary, "PNR15 Non-Earning (10%)"=bnr$breach,
+                   "PNR16 Borrowings (25%)"=bnr$secondary)
+
+  p <- plot_ly()
+  for (pnr in unique(j$PNR)) {
+    sub <- j[j$PNR == pnr, ]
+    p <- p %>%
+      add_lines(data=sub, x=~year_month, y=~Ratio,
+                name=pnr, line=list(color=line_colors[[pnr]], width=2),
+                hovertemplate=paste0(pnr,"<br>%{x}: %{y:.1f}%<extra></extra>")) %>%
+      add_lines(x=range(sub$year_month),
+                y=rep(limits_map[[pnr]],2),
+                name=paste("Limit:", pnr),
+                line=list(color=line_colors[[pnr]], dash="dot", width=1),
+                showlegend=FALSE)
+  }
+  p %>% bnr_layout("Sector Average PNR Ratios – 12 Month Trend",
+                   xlab="Month", ylab="% of Total Assets")
+})
+```
+
+Row {data-height=320}
+--------------------------------------------------------------------------------
+
+### PNR Detail Table
+
+```{r}
+# Detailed table showing every institution × month with all 6 PNR ratios.
+# Cells are colour-coded: green / amber / red based on % of the regulatory limit.
+renderDT({
+  d  <- filter_df(df_pnr)
+  ta <- filter_df(df_ta)
+  if (is.null(d) || is.null(ta) || nrow(d)==0)
+    return(datatable(data.frame(Message="No data")))
+
+  j <- d %>%
+    left_join(ta %>% select(le_book,year_month,total_assets), by=c("le_book","year_month")) %>%
+    filter(!is.na(total_assets), total_assets > 0) %>%
+    mutate(
+      inst_label = coalesce(leb_description, le_book),  # human-readable name
+      # Each PNR = balance / total_assets × 100 (expressed as a percentage)
+      PNR13_pct  = round(investment_in_fixed_assets  / total_assets * 100, 2),
+      PNR14_pct  = round(land_and_buildings          / total_assets * 100, 2),
+      PNR15_pct  = round(non_earning_assets           / total_assets * 100, 2),
+      PNR16_pct  = round(borrowings                   / total_assets * 100, 2),
+      PNR17_pct  = round(placement_limits             / total_assets * 100, 2),
+      PNR18_pct  = round(investment_in_equity_shares  / total_assets * 100, 2)
+    ) %>%
+    arrange(desc(year_month)) %>%   # most recent month first
+    select(inst_label, year_month, category_type,
+           PNR13_pct, PNR14_pct, PNR15_pct, PNR16_pct, PNR17_pct, PNR18_pct)
+
+  datatable(
+    j,
+    options = list(
+      pageLength = 8,              # rows per page
+      scrollX    = TRUE,           # horizontal scroll for wide tables
+      dom        = "frtip",        # show: filter, table, info, pagination (no length menu)
+      # initComplete: JavaScript that runs after the table renders —
+      # applies BNR maroon background to the column header row
+      initComplete = JS("function(s,dt){$(dt.table().header()).css({'background':'#753918','color':'#FCF7EA'});}"),
+      # columnDefs: JavaScript renderer that appends "%" to each PNR cell value
+      # targets=3 means the 4th column (0-indexed), which is PNR13_pct, etc.
+      columnDefs = list(
+        list(targets=3, render=JS("function(d){return d+'%';}")),
+        list(targets=4, render=JS("function(d){return d+'%';}")),
+        list(targets=5, render=JS("function(d){return d+'%';}")),
+        list(targets=6, render=JS("function(d){return d+'%';}")),
+        list(targets=7, render=JS("function(d){return d+'%';}")),
+        list(targets=8, render=JS("function(d){return d+'%';}"))
+      )),
+    rownames = FALSE,
+    colnames = c("Institution","Year_Month","Type",
+                 "PNR13 (≤50%)","PNR14 (≤5%)","PNR15 (≤10%)",
+                 "PNR16 (≤25%)","PNR17 (≤25%)","PNR18 (≤25%)")
+  ) %>%
+    # formatStyle applies R-side conditional background colour to the PNR columns.
+    # styleInterval(c(0.7, 1.0), colours):
+    #   value < 0.7  → green  (well within limit — but note: values here are raw %,
+    #   value < 1.0  → amber    so thresholds need to be set per-column in production)
+    #   value >= 1.0 → maroon (at or above the limit)
+    formatStyle(
+      c("PNR13_pct","PNR14_pct","PNR15_pct","PNR16_pct","PNR17_pct","PNR18_pct"),
+      backgroundColor = styleInterval(
+        c(0.7, 1.0),
+        c(bnr$compliant, bnr$warning_c, bnr$breach)
+      )
+    )
+})
+```
