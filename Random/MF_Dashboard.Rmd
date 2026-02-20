@@ -221,7 +221,7 @@ path <- list(
 # ============================================================
 # DATA LOADING
 # ============================================================
-le_books   <- paste0(4, sprintf("%02d", 1:20))
+le_books   <- paste0(4, sprintf("%03d", 1:200))
 yr_months  <- format(
   seq(as.Date("2024-03-01"), by = "month", length.out = 12),
   "%Y%m"
@@ -393,10 +393,10 @@ if (!is.null(con)) {
 
   # LE_Book lookup table (mirrors ALL_LEBOOK_CATEGORY_AND_DESCRIPTIONS.sql)
   df_lebook <- data.frame(
-    le_book              = le_books,
+    le_book              = le_books[seq_along(inst_names)],
     leb_description      = inst_names,
     leb_short_description= substr(inst_names, 1, 12),
-    category_type        = sample(categories, length(le_books), replace = TRUE),
+    category_type        = sample(categories, length(inst_names), replace = TRUE),
     leb_status           = "A",
     stringsAsFactors     = FALSE
   )
