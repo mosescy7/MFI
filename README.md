@@ -1,6 +1,7 @@
 # Financial Health Dashboard – EDW Queries
 
 SQL queries and R scripts used to extract regulatory and prudential data from the **VISION** Oracle Enterprise Data Warehouse (EDW) for the **Microfinance Supervision Department (MFSD)** Financial Health Dashboard.
+Dashboard:https://bnrdashboards.shinyapps.io/MFSD-Dashboard/
 
 > **Regulatory reference:** Regulation No 60/2023 of 27/03/2023 determining prudential norms for deposit-taking microfinance institutions.
 
