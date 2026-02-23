@@ -72,26 +72,88 @@ WITH UnpivotedData AS (
             AND lb.CATEGORY_TYPE IN ('MF','SACCO','OSACCO','DSACCO')
             -- All FRL codes across all 6 metrics (union of all)
             AND frl.FRL_Line IN (
-                -- PNR13: Investment in fixed assets
-                'F1700010','F1700015','F1700016','F1700025','F1700026',
-                'F1700030','F1700031','F1700035','F1700036','F1700040',
-                'F1700041','F1700050','F1700051','F1700056','F1700060',
-                'F1700065','F1700071','F1700080','F1700081','F1700105',
-                'F1700160','F1700320','F1700410','F1700610','F1700690',
-                -- PNR15: Non-earning assets (codes not already listed above)
-                'F1120317','F1120319','F1120365',
-                'F1200230','F1200250','F1200315','F1200510','F1200511','F1200520',
-                'F1210010','F1210015','F1210440',
-                'F1500010','F1500011','F1500012','F1500016','F1500017',
-                'F1500085','F1500086','F1500087','F1500088','F1500135',
-                'F1500145','F1500210','F1500211','F1500212','F1500213',
-                'F1500310','F1500410','F1500411','F1500412','F1500413',
-                'F1500422','F1500480','F1500510','F1500511','F1500512',
-                'F1500513','F1500550','F1500612','F1500690','F1500815',
-                'F1500830','F1500860','F1500980','F1501030','F1501040',
-                -- PNR16: Borrowings
-                'F2110260','F2120010','F2120070','F2120080','F2120155',
-                'F2120175','F2120350','F2120355','F2120420','F2150315'
+                'F1700010',  /* Land */
+                'F1700015',  /* Properties, Buildings and Offices */
+                'F1700016',  /* Accumulated Dep. - Properties, Buildings And Offices */
+                'F1700025',  /* Equipments, Furniture and IT */
+                'F1700026',  /* Accumulated Dep. - Equipment, Furniture And It */
+                'F1700030',  /* Vehicles */
+                'F1700031',  /* Accumulated Dep. - Vehicles */
+                'F1700035',  /* Refurbishment and Installation */
+                'F1700036',  /* Accumulated Dep. - Refurbishment And Installation */
+                'F1700040',  /* Other tangible fixed assets */
+                'F1700041',  /* Accumulated Dep. - Other Tangible Fixed Assets */
+                'F1700050',  /* Property, Plant and Equipment */
+                'F1700051',  /* Accumulated Dep. - Property, Plant And Equipment */
+                'F1700056',  /* Accumulated Dep. - Investment Property */
+                'F1700060',  /* Fixed Assets in progress */
+                'F1700065',  /* WIP Buildings */
+                'F1700071',  /* Accumulated Dep. - WIP Motor vehicle */
+                'F1700080',  /* WIP Softwares */
+                'F1700081',  /* Accumulated Dep. - WIP Software */
+                'F1700105',  /* WIP Computer Equipment */
+                'F1700160',  /* Machines Asset Clearing */
+                'F1700320',  /* Building of Placement */
+                'F1700410',  /* Depreciation of fixed tangible assets */
+                'F1700610',  /* Amortization Software */
+                'F1700690',  /* Other Intangible assets */
+                'F1120317',  /* Fixed Term Deposits With Banks In Rwanda (LCY) */
+                'F1120319',  /* Fixed Term Deposits With Banks In Rwanda (FCY) */
+                'F1120365',  /* Accrual receivable interests with the banks & other FI (LCY) */
+                'F1200230',  /* Suspended interests (LCY) */
+                'F1200250',  /* Accrual receivable interests (LCY) */
+                'F1200315',  /* Other debt securities */
+                'F1200510',  /* Treasury Bills HTM */
+                'F1200511',  /* Government ,Treasury Bonds HTM */
+                'F1200520',  /* Accrual receivable interests on financial instruments HTM */
+                'F1210010',  /* Equity investment */
+                'F1210015',  /* Investment in subsidiaries */
+                'F1210440',  /* Accrual receivable interests */
+                'F1500010',  /* Overdrawn Accounts (LCY) */
+                'F1500011',  /* Provisions on NPL Overdrawn accounts(LCY) */
+                'F1500012',  /* Non performing Overdrwawn accounts(LCY) */
+                'F1500016',  /* Suspended Interest on Overdrawn A/C (LCY) */
+                'F1500017',  /* Suspended Interest on Overdrawn A/C (FCY) */
+                'F1500085',  /* Term treasury loans (LCY) */
+                'F1500086',  /* Non performing loans Treasury Loans(LCY) */
+                'F1500087',  /* Provisions on NPL Treasury Loans(LCY) */
+                'F1500088',  /* Suspended Interest on Treasury Loans (LCY) */
+                'F1500135',  /* Other Treasury Loans (LCY) */
+                'F1500145',  /* Accrual Receivable Interest on Treasury Loans (LCY) */
+                'F1500210',  /* Equipment loans (LCY) */
+                'F1500211',  /* Non performing loans Equipment Loans(LCY) */
+                'F1500212',  /* Provisions on NPL Equipment Loans(LCY) */
+                'F1500213',  /* Suspended Interest on Equipment Loans (LCY) */
+                'F1500310',  /* Accrual Receivable Interest on Equipment Loans (LCY) */
+                'F1500410',  /* Consumer loans (LCY) */
+                'F1500411',  /* Non performing loans Consumer Loans(LCY) */
+                'F1500412',  /* Provisions on NPL Consumer Loans(LCY) */
+                'F1500413',  /* Suspended Interests On Consumer Loans (LCY) */
+                'F1500422',  /* Provisions on NPL Consumer Loans(FCY) */
+                'F1500480',  /* Accrual Receivable Interests on Consumer Loans (LCY) */
+                'F1500510',  /* Mortgage Loans (LCY) */
+                'F1500511',  /* Non performing loans Mortgage Loan (LCY) */
+                'F1500512',  /* Provisions on NPL Mortgage Loan(LCY) */
+                'F1500513',  /* Suspended Interests on Mortgage Loan (LCY) */
+                'F1500550',  /* Accrual Receivable Interests on Mortgage Loan (LCY) */
+                'F1500612',  /* Provisions on NPL Finance Lease(LCY) */
+                'F1500690',  /* Accrual Receivable Interests on Finance Lease (LCY) */
+                'F1500815',  /* Loans To The Agriculture Sector And Agro Business Sector */
+                'F1500830',  /* Loans And Advances To Staff */
+                'F1500860',  /* Salary Advance */
+                'F1500980',  /* Other Loans of Clients (LCY) */
+                'F1501030',  /* Accrual Receivable Interests on other Loans of Clients (LCY) */
+                'F1501040',  /* Other loans and advances */
+                'F2110260',  /* Subordinated borrowings (LCY) */
+                'F2120010',  /* Central Bank */
+                'F2120070',  /* Due to banks In Rwanda */
+                'F2120080',  /* Due to other institutions classified as banks and other FI */
+                'F2120155',  /* Term treasury borrowings (LCY) */
+                'F2120175',  /* Overnight treasury borrowings (LCY) */
+                'F2120350',  /* Finance borrowings to banks and other FI (LCY) */
+                'F2120355',  /* Finance borrowings to banks and other FI (FCY) */
+                'F2120420',  /* Finance borrowings Subsidiaries (LCY) */
+                'F2150315'  /* Intergroup Operations With Parents, Subsidiaries And Branches */
             )
     )
     UNPIVOT (
@@ -116,48 +178,121 @@ SELECT
 
     -- PNR13: Investment in fixed assets (Max 50% of core capital)
     SUM(CASE WHEN FRL_Line IN (
-        'F1700010','F1700015','F1700016','F1700025','F1700026',
-        'F1700030','F1700031','F1700035','F1700036','F1700040',
-        'F1700041','F1700050','F1700051','F1700056','F1700060',
-        'F1700065','F1700071','F1700080','F1700081','F1700105',
-        'F1700160','F1700320','F1700410','F1700610','F1700690'
-    ) THEN Balance_Value ELSE 0 END) AS Investment_In_Fixed_Assets,
+        'F1700010',  /* Land */
+        'F1700015',  /* Properties, Buildings and Offices */
+        'F1700016',  /* Accumulated Dep. - Properties, Buildings And Offices */
+        'F1700025',  /* Equipments, Furniture and IT */
+        'F1700026',  /* Accumulated Dep. - Equipment, Furniture And It */
+        'F1700030',  /* Vehicles */
+        'F1700031',  /* Accumulated Dep. - Vehicles */
+        'F1700035',  /* Refurbishment and Installation */
+        'F1700036',  /* Accumulated Dep. - Refurbishment And Installation */
+        'F1700040',  /* Other tangible fixed assets */
+        'F1700041',  /* Accumulated Dep. - Other Tangible Fixed Assets */
+        'F1700050',  /* Property, Plant and Equipment */
+        'F1700051',  /* Accumulated Dep. - Property, Plant And Equipment */
+        'F1700056',  /* Accumulated Dep. - Investment Property */
+        'F1700060',  /* Fixed Assets in progress */
+        'F1700065',  /* WIP Buildings */
+        'F1700071',  /* Accumulated Dep. - WIP Motor vehicle */
+        'F1700080',  /* WIP Softwares */
+        'F1700081',  /* Accumulated Dep. - WIP Software */
+        'F1700105',  /* WIP Computer Equipment */
+        'F1700160',  /* Machines Asset Clearing */
+        'F1700320',  /* Building of Placement */
+        'F1700410',  /* Depreciation of fixed tangible assets */
+        'F1700610',  /* Amortization Software */
+        'F1700690'  /* Other Intangible assets */
+    )
 
     -- PNR14: Land and buildings (Max 5% of total assets)
     SUM(CASE WHEN FRL_Line IN (
-        'F1700010','F1700015','F1700016','F1700035','F1700036',
-        'F1700050','F1700051','F1700320'
-    ) THEN Balance_Value ELSE 0 END) AS Land_And_Buildings,
+        'F1700010',  /* Land */
+        'F1700015',  /* Properties, Buildings and Offices */
+        'F1700016',  /* Accumulated Dep. - Properties, Buildings And Offices */
+        'F1700035',  /* Refurbishment and Installation */
+        'F1700036',  /* Accumulated Dep. - Refurbishment And Installation */
+        'F1700050',  /* Property, Plant and Equipment */
+        'F1700051',  /* Accumulated Dep. - Property, Plant And Equipment */
+        'F1700320'  /* Building of Placement */
+    )
 
     -- PNR15: Non-earning assets (Max 10% of total assets)
     SUM(CASE WHEN FRL_Line IN (
-        'F1120317','F1120319','F1120365','F1200230','F1200250',
-        'F1200315','F1200510','F1200511','F1200520',
-        'F1210010','F1210015','F1210440',
-        'F1500010','F1500011','F1500012','F1500016','F1500017',
-        'F1500085','F1500086','F1500087','F1500088','F1500135',
-        'F1500145','F1500210','F1500211','F1500212','F1500213',
-        'F1500310','F1500410','F1500411','F1500412','F1500413',
-        'F1500422','F1500480','F1500510','F1500511','F1500512',
-        'F1500513','F1500550','F1500612','F1500690','F1500815',
-        'F1500830','F1500860','F1500980','F1501030','F1501040'
-    ) THEN Balance_Value ELSE 0 END) AS Non_Earning_Assets,
+        'F1120317',  /* Fixed Term Deposits With Banks In Rwanda (LCY) */
+        'F1120319',  /* Fixed Term Deposits With Banks In Rwanda (FCY) */
+        'F1120365',  /* Accrual receivable interests with the banks & other FI (LCY) */
+        'F1200230',  /* Suspended interests (LCY) */
+        'F1200250',  /* Accrual receivable interests (LCY) */
+        'F1200315',  /* Other debt securities */
+        'F1200510',  /* Treasury Bills HTM */
+        'F1200511',  /* Government ,Treasury Bonds HTM */
+        'F1200520',  /* Accrual receivable interests on financial instruments HTM */
+        'F1210010',  /* Equity investment */
+        'F1210015',  /* Investment in subsidiaries */
+        'F1210440',  /* Accrual receivable interests */
+        'F1500010',  /* Overdrawn Accounts (LCY) */
+        'F1500011',  /* Provisions on NPL Overdrawn accounts(LCY) */
+        'F1500012',  /* Non performing Overdrwawn accounts(LCY) */
+        'F1500016',  /* Suspended Interest on Overdrawn A/C (LCY) */
+        'F1500017',  /* Suspended Interest on Overdrawn A/C (FCY) */
+        'F1500085',  /* Term treasury loans (LCY) */
+        'F1500086',  /* Non performing loans Treasury Loans(LCY) */
+        'F1500087',  /* Provisions on NPL Treasury Loans(LCY) */
+        'F1500088',  /* Suspended Interest on Treasury Loans (LCY) */
+        'F1500135',  /* Other Treasury Loans (LCY) */
+        'F1500145',  /* Accrual Receivable Interest on Treasury Loans (LCY) */
+        'F1500210',  /* Equipment loans (LCY) */
+        'F1500211',  /* Non performing loans Equipment Loans(LCY) */
+        'F1500212',  /* Provisions on NPL Equipment Loans(LCY) */
+        'F1500213',  /* Suspended Interest on Equipment Loans (LCY) */
+        'F1500310',  /* Accrual Receivable Interest on Equipment Loans (LCY) */
+        'F1500410',  /* Consumer loans (LCY) */
+        'F1500411',  /* Non performing loans Consumer Loans(LCY) */
+        'F1500412',  /* Provisions on NPL Consumer Loans(LCY) */
+        'F1500413',  /* Suspended Interests On Consumer Loans (LCY) */
+        'F1500422',  /* Provisions on NPL Consumer Loans(FCY) */
+        'F1500480',  /* Accrual Receivable Interests on Consumer Loans (LCY) */
+        'F1500510',  /* Mortgage Loans (LCY) */
+        'F1500511',  /* Non performing loans Mortgage Loan (LCY) */
+        'F1500512',  /* Provisions on NPL Mortgage Loan(LCY) */
+        'F1500513',  /* Suspended Interests on Mortgage Loan (LCY) */
+        'F1500550',  /* Accrual Receivable Interests on Mortgage Loan (LCY) */
+        'F1500612',  /* Provisions on NPL Finance Lease(LCY) */
+        'F1500690',  /* Accrual Receivable Interests on Finance Lease (LCY) */
+        'F1500815',  /* Loans To The Agriculture Sector And Agro Business Sector */
+        'F1500830',  /* Loans And Advances To Staff */
+        'F1500860',  /* Salary Advance */
+        'F1500980',  /* Other Loans of Clients (LCY) */
+        'F1501030',  /* Accrual Receivable Interests on other Loans of Clients (LCY) */
+        'F1501040'  /* Other loans and advances */
+    )
 
     -- PNR16: Borrowing ratio (Max 25% of core capital)
     SUM(CASE WHEN FRL_Line IN (
-        'F2110260','F2120010','F2120070','F2120080','F2120155',
-        'F2120175','F2120350','F2120355','F2120420','F2150315'
-    ) THEN Balance_Value ELSE 0 END) AS Borrowings,
+        'F2110260',  /* Subordinated borrowings (LCY) */
+        'F2120010',  /* Central Bank */
+        'F2120070',  /* Due to banks In Rwanda */
+        'F2120080',  /* Due to other institutions classified as banks and other FI */
+        'F2120155',  /* Term treasury borrowings (LCY) */
+        'F2120175',  /* Overnight treasury borrowings (LCY) */
+        'F2120350',  /* Finance borrowings to banks and other FI (LCY) */
+        'F2120355',  /* Finance borrowings to banks and other FI (FCY) */
+        'F2120420',  /* Finance borrowings Subsidiaries (LCY) */
+        'F2150315'  /* Intergroup Operations With Parents, Subsidiaries And Branches */
+    )
 
     -- PNR17: Placement limits (Max 25% of core capital)
     SUM(CASE WHEN FRL_Line IN (
-        'F1120317','F1120319'
-    ) THEN Balance_Value ELSE 0 END) AS Placement_Limits,
+        'F1120317',  /* Fixed Term Deposits With Banks In Rwanda (LCY) */
+        'F1120319'  /* Fixed Term Deposits With Banks In Rwanda (FCY) */
+    )
 
     -- PNR18: Investment in equity shares (Max 25% of core capital)
     SUM(CASE WHEN FRL_Line IN (
-        'F1210010','F1210015'
-    ) THEN Balance_Value ELSE 0 END) AS Investment_In_Equity_Shares
+        'F1210010',  /* Equity investment */
+        'F1210015'  /* Investment in subsidiaries */
+    )
 
 FROM UnpivotedData
 GROUP BY

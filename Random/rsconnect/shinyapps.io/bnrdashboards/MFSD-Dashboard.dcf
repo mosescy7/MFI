@@ -5,6 +5,6 @@ account: bnrdashboards
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 16723335
-bundleId: 11607437
+bundleId: 11617822
 url: https://bnrdashboards.shinyapps.io/MFSD-Dashboard/
 version: 1

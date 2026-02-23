@@ -44,7 +44,10 @@ FROM (
         AND fhb.Bal_Type = 1
         AND fhh.Year >= TO_CHAR(ADD_MONTHS(SYSDATE, -12), 'YYYY')
         AND lb.CATEGORY_TYPE IN ('MF','SACCO','OSACCO','DSACCO')
-        AND frl.FRL_Line IN ('F1210010','F1210015')
+        AND frl.FRL_Line IN (
+            'F1210010',  /* Equity investment */
+            'F1210015'  /* Investment in subsidiaries */
+        )
 )
 UNPIVOT (
     Balance_Value FOR Month_Number IN (

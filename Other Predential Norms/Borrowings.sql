@@ -45,8 +45,16 @@ FROM (
         AND fhh.Year >= TO_CHAR(ADD_MONTHS(SYSDATE, -12), 'YYYY')
         AND lb.CATEGORY_TYPE IN ('MF','SACCO','OSACCO','DSACCO')
         AND frl.FRL_Line IN (
-            'F2120010','F2120070','F2120080','F2120175','F2120155',
-            'F2110260','F2120350','F2120355','F2150315','F2120420'
+            'F2120010',  /* Central Bank */
+            'F2120070',  /* Due to banks In Rwanda */
+            'F2120080',  /* Due to other institutions classified as banks and other FI */
+            'F2120175',  /* Overnight treasury borrowings (LCY) */
+            'F2120155',  /* Term treasury borrowings (LCY) */
+            'F2110260',  /* Subordinated borrowings (LCY) */
+            'F2120350',  /* Finance borrowings to banks and other FI (LCY) */
+            'F2120355',  /* Finance borrowings to banks and other FI (FCY) */
+            'F2150315',  /* Intergroup Operations With Parents, Subsidiaries And Branches */
+            'F2120420'  /* Finance borrowings Subsidiaries (LCY) */
         )
 )
 UNPIVOT (

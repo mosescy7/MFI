@@ -44,8 +44,14 @@ FROM (
         AND fhh.Year >= TO_CHAR(ADD_MONTHS(SYSDATE, -12), 'YYYY')
         AND lb.CATEGORY_TYPE IN ('MF','SACCO','OSACCO','DSACCO')
         AND frl.FRL_Line IN (
-            'F1700010','F1700015','F1700016','F1700035','F1700036',
-            'F1700050','F1700051','F1700320'
+            'F1700010',  /* Land */
+            'F1700015',  /* Properties, Buildings and Offices */
+            'F1700016',  /* Accumulated Dep. - Properties, Buildings And Offices */
+            'F1700035',  /* Refurbishment and Installation */
+            'F1700036',  /* Accumulated Dep. - Refurbishment And Installation */
+            'F1700050',  /* Property, Plant and Equipment */
+            'F1700051',  /* Accumulated Dep. - Property, Plant And Equipment */
+            'F1700320'  /* Building of Placement */
         )
 )
 UNPIVOT (

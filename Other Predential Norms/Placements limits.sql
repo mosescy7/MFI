@@ -45,7 +45,10 @@ FROM (
         AND fhb.Bal_Type = 1
         AND fhh.Year >= TO_CHAR(ADD_MONTHS(SYSDATE, -12), 'YYYY')
         AND lb.CATEGORY_TYPE IN ('MF','SACCO','OSACCO','DSACCO')
-        AND frl.FRL_Line IN ('F1120317','F1120319')
+        AND frl.FRL_Line IN (
+            'F1120317',  /* Fixed Term Deposits With Banks In Rwanda (LCY) */
+            'F1120319'  /* Fixed Term Deposits With Banks In Rwanda (FCY) */
+        )
 )
 UNPIVOT (
     Balance_Value FOR Month_Number IN (

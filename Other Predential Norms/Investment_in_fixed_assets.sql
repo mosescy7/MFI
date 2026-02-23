@@ -45,11 +45,31 @@ FROM (
         AND fhh.Year >= TO_CHAR(ADD_MONTHS(SYSDATE, -12), 'YYYY')
         AND lb.CATEGORY_TYPE IN ('MF','SACCO','OSACCO','DSACCO')
         AND frl.FRL_Line IN (
-            'F1700080','F1700081','F1700105','F1700160','F1700610','F1700690',
-            'F1700010','F1700015','F1700016','F1700025','F1700026','F1700030',
-            'F1700031','F1700035','F1700036','F1700040','F1700041','F1700050',
-            'F1700051','F1700060','F1700065','F1700071','F1700320','F1700410',
-            'F1700056'
+            'F1700080',  /* WIP Softwares */
+            'F1700081',  /* Accumulated Dep. - WIP Software */
+            'F1700105',  /* WIP Computer Equipment */
+            'F1700160',  /* Machines Asset Clearing */
+            'F1700610',  /* Amortization Software */
+            'F1700690',  /* Other Intangible assets */
+            'F1700010',  /* Land */
+            'F1700015',  /* Properties, Buildings and Offices */
+            'F1700016',  /* Accumulated Dep. - Properties, Buildings And Offices */
+            'F1700025',  /* Equipments, Furniture and IT */
+            'F1700026',  /* Accumulated Dep. - Equipment, Furniture And It */
+            'F1700030',  /* Vehicles */
+            'F1700031',  /* Accumulated Dep. - Vehicles */
+            'F1700035',  /* Refurbishment and Installation */
+            'F1700036',  /* Accumulated Dep. - Refurbishment And Installation */
+            'F1700040',  /* Other tangible fixed assets */
+            'F1700041',  /* Accumulated Dep. - Other Tangible Fixed Assets */
+            'F1700050',  /* Property, Plant and Equipment */
+            'F1700051',  /* Accumulated Dep. - Property, Plant And Equipment */
+            'F1700060',  /* Fixed Assets in progress */
+            'F1700065',  /* WIP Buildings */
+            'F1700071',  /* Accumulated Dep. - WIP Motor vehicle */
+            'F1700320',  /* Building of Placement */
+            'F1700410',  /* Depreciation of fixed tangible assets */
+            'F1700056'  /* Accumulated Dep. - Investment Property */
         )
 )
 UNPIVOT (

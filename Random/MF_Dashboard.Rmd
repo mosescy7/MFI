@@ -125,6 +125,17 @@ library(plotly)          # Converts ggplot2/plot_ly charts to interactive HTML
 library(DT)              # Renders R data frames as interactive sortable tables
 library(scales)          # Formats numbers (e.g. comma(1000000) → "1,000,000")
 library(tidyr)           # pivot_longer: reshapes wide data to long for charts
+library(shinymanager)    # Login screen / access control
+
+# ============================================================
+# ACCESS CONTROL – authorised BNR users
+# ============================================================
+credentials <- data.frame(
+  user     = c("bnr_admin",  "mfsd_user"),
+  password = c("BNR@2025!",  "MFSD@2025!"),
+  name     = c("Admin",      "MFSD Staff"),
+  stringsAsFactors = FALSE
+)
 
 # ============================================================
 # BNR COLOR PALETTE  (from BNR Official Theme – Extended.json)
@@ -574,6 +585,31 @@ Sidebar {.sidebar}
 # These inputs are REACTIVE — any chart that reads them automatically
 # re-runs whenever the user changes a selection.
 # ============================================================
+# ── Authentication ──────────────────────────────────────────────
+div(style = "margin-bottom:16px;",
+  h4("BNR – MFSD Access", style = "color:#DBA628; font-weight:700; margin-top:0;"),
+  passwordInput("auth_pass", NULL, placeholder = "Enter password", width = "100%"),
+  actionButton("auth_btn", "Login", width = "100%",
+               style = "background:#753918; color:#FCF7EA; border:none; margin-top:4px;"),
+  uiOutput("auth_msg")
+)
+
+# Reactive: TRUE once correct password is typed
+is_auth <- reactive({
+  input$auth_btn   # re-evaluate on button click
+  isolate(input$auth_pass) %in% credentials$password
+})
+
+# Show feedback message
+output$auth_msg <- renderUI({
+  req(input$auth_btn > 0)
+  if (is_auth()) {
+    tags$p("\u2713 Access granted", style = "color:#28a745; font-size:12px; margin:4px 0 0;")
+  } else {
+    tags$p("\u2717 Incorrect password", style = "color:#dc3545; font-size:12px; margin:4px 0 0;")
+  }
+})
+
 hr()
 h4("Filters", style = "color:#DBA628; font-weight:700; margin-top:0;")
 
@@ -660,6 +696,7 @@ Row {data-height=160}
 # renderValueBox() creates a KPI tile that re-draws whenever filters change.
 # unique(le_book) counts distinct institutions after applying sidebar filters.
 renderValueBox({
+  req(is_auth())
   n <- length(unique(filter_df(df_pnr)$le_book))
   valueBox(n, "Institutions", icon = "fa-building", color = bnr$primary)
 })
@@ -672,6 +709,7 @@ renderValueBox({
 # Requires joining df_pnr with df_ta to compute the ratios
 # (both tables share le_book + year_month as the join key).
 renderValueBox({
+  req(is_auth())
   d  <- filter_df(df_pnr)
   ta <- filter_df(df_ta)
   if (!is.null(d) && !is.null(ta) && nrow(d) > 0 && nrow(ta) > 0) {
@@ -696,6 +734,7 @@ renderValueBox({
 ### Total Insider Loans Exposure {.value-box}
 ```{r}
 renderValueBox({
+  req(is_auth())
   d <- filter_df(df_ins)
   val <- if (!is.null(d) && nrow(d) > 0 && "insider_loans_lcy" %in% names(d))
     rwf_m(sum(as.numeric(d$insider_loans_lcy), na.rm = TRUE))
@@ -707,6 +746,7 @@ renderValueBox({
 ### Reporting Period {.value-box}
 ```{r}
 renderValueBox({
+  req(is_auth())
   valueBox(
     paste(input$ym_from, "→", input$ym_to),
     "Reporting Window", icon = "fa-calendar",
@@ -725,6 +765,7 @@ Row {data-height=400}
 # for the most recent month, with a dashed line at the regulatory limit.
 # Bar colour: green = compliant, amber = within 70–100% of limit, red = breach.
 renderPlotly({
+  req(is_auth())
   d  <- filter_df(df_pnr)
   ta <- filter_df(df_ta)
   if (is.null(d) || is.null(ta) || nrow(d) == 0) {
@@ -775,6 +816,7 @@ renderPlotly({
 
 ```{r}
 renderPlotly({
+  req(is_auth())
   d <- filter_df(df_ins)
   if (is.null(d) || nrow(d) == 0) return(plotly_empty())
 
@@ -799,6 +841,7 @@ Row {data-height=120}
 ### Tier 1 Capital Ratio (Min 10%) {.value-box}
 ```{r}
 renderValueBox({
+  req(is_auth())
   d <- filter_df(df_car)
   val <- if (!is.null(d) && "car_line_code_desc" %in% names(d))
     paste0(round(mean(d$value_lcy[grepl("Tier 1|Core", d$car_line_code_desc, ignore.case=T)], na.rm=T) / 1e6, 0), "M")
@@ -810,6 +853,7 @@ renderValueBox({
 ### SACCO Equity-to-Assets {.value-box}
 ```{r}
 renderValueBox({
+  req(is_auth())
   d <- filter_df(df_sacco)
   eq  <- sum(d$amount_lcy[d$gl_type == 30], na.rm = TRUE)
   ast <- sum(d$amount_lcy[d$gl_type == 10], na.rm = TRUE)
@@ -825,6 +869,7 @@ Row {data-height=420}
 
 ```{r}
 renderPlotly({
+  req(is_auth())
   d <- filter_df(df_car)
   if (is.null(d) || nrow(d) == 0) return(plotly_empty())
 
@@ -854,6 +899,7 @@ renderPlotly({
 
 ```{r}
 renderPlotly({
+  req(is_auth())
   d <- filter_df(df_sacco)
   if (is.null(d) || nrow(d) == 0) return(plotly_empty())
 
@@ -891,6 +937,7 @@ Row {data-height=320}
 
 ```{r}
 renderDT({
+  req(is_auth())
   d <- filter_df(df_car)
   if (is.null(d) || nrow(d) == 0) return(datatable(data.frame(Message = "No data")))
 
@@ -916,6 +963,7 @@ Row {data-height=120}
 ### Top Borrower (Max Exposure) {.value-box}
 ```{r}
 renderValueBox({
+  req(is_auth())
   d <- filter_df(df_sb)
   val <- if (!is.null(d) && nrow(d) > 0)
     rwf_m(max(as.numeric(d$borrower_exposure), na.rm = TRUE))
@@ -927,6 +975,7 @@ renderValueBox({
 ### NPL Borrowers {.value-box}
 ```{r}
 renderValueBox({
+  req(is_auth())
   d <- filter_df(df_sb)
   n <- if (!is.null(d) && "performance_status" %in% names(d))
     sum(d$performance_status == "NPL", na.rm = TRUE)
@@ -938,6 +987,7 @@ renderValueBox({
 ### Related Party Loans Exposure {.value-box}
 ```{r}
 renderValueBox({
+  req(is_auth())
   d <- filter_df(df_rp)
   val <- if (!is.null(d) && "insider_loans_lcy" %in% names(d))
     rwf_m(sum(as.numeric(d$insider_loans_lcy), na.rm = TRUE))
@@ -953,6 +1003,7 @@ Row {data-height=400}
 
 ```{r}
 renderPlotly({
+  req(is_auth())
   d <- filter_df(df_sb)
   if (is.null(d) || nrow(d) == 0) return(plotly_empty())
 
@@ -986,6 +1037,7 @@ renderPlotly({
 
 ```{r}
 renderPlotly({
+  req(is_auth())
   d <- filter_df(df_ins)
   if (is.null(d) || nrow(d) == 0) return(plotly_empty())
 
@@ -1017,6 +1069,7 @@ Row {data-height=300}
 
 ```{r}
 renderPlotly({
+  req(is_auth())
   d <- filter_df(df_ins)
   if (is.null(d) || nrow(d) == 0) return(plotly_empty())
   d_sum <- d %>%
@@ -1037,6 +1090,7 @@ renderPlotly({
 
 ```{r}
 renderDT({
+  req(is_auth())
   d <- filter_df(df_ins)
   if (is.null(d) || nrow(d) == 0) return(datatable(data.frame(Message="No data")))
 
@@ -1064,6 +1118,7 @@ Row {data-height=120}
 ### Max Top-5 Concentration {.value-box}
 ```{r}
 renderValueBox({
+  req(is_auth())
   d <- filter_df(df_dep)
   val <- if (!is.null(d) && "top5_pct" %in% names(d))
     paste0(round(max(d$top5_pct, na.rm=T), 1), "%")
@@ -1075,6 +1130,7 @@ renderValueBox({
 ### Institutions with Top-5 > 30% {.value-box}
 ```{r}
 renderValueBox({
+  req(is_auth())
   d <- filter_df(df_dep)
   n <- if (!is.null(d) && "top5_pct" %in% names(d))
     sum(d$top5_pct > 30, na.rm = TRUE)
@@ -1086,6 +1142,7 @@ renderValueBox({
 ### Total Deposits Monitored {.value-box}
 ```{r}
 renderValueBox({
+  req(is_auth())
   d <- filter_df(df_dep)
   val <- if (!is.null(d) && "total_deposits" %in% names(d))
     rwf_m(sum(d$total_deposits, na.rm=T))
@@ -1101,6 +1158,7 @@ Row {data-height=420}
 
 ```{r}
 renderPlotly({
+  req(is_auth())
   d <- filter_df(df_dep)
   if (is.null(d) || nrow(d) == 0) return(plotly_empty())
 
@@ -1137,6 +1195,7 @@ renderPlotly({
 
 ```{r}
 renderPlotly({
+  req(is_auth())
   d <- filter_df(df_dep)
   if (is.null(d) || nrow(d) == 0) return(plotly_empty())
 
@@ -1173,6 +1232,7 @@ Row {data-height=300}
 
 ```{r}
 renderDT({
+  req(is_auth())
   d <- filter_df(df_dep)
   if (is.null(d) || nrow(d) == 0) return(datatable(data.frame(Message="No data")))
 
@@ -1206,6 +1266,7 @@ Row {data-height=120}
 ### PNR13 – Fixed Assets {.value-box}
 ```{r}
 renderValueBox({
+  req(is_auth())
   d <- filter_df(df_pnr); ta <- filter_df(df_ta); val <- "–"
   if (!is.null(d) && !is.null(ta) && nrow(d)>0 && nrow(ta)>0) {
     j <- d %>% left_join(ta %>% select(le_book,year_month,total_assets), by=c("le_book","year_month")) %>%
@@ -1219,6 +1280,7 @@ renderValueBox({
 ### PNR15 – Non-Earning Assets {.value-box}
 ```{r}
 renderValueBox({
+  req(is_auth())
   d <- filter_df(df_pnr); ta <- filter_df(df_ta); val <- "–"
   if (!is.null(d) && !is.null(ta) && nrow(d)>0 && nrow(ta)>0) {
     j <- d %>% left_join(ta %>% select(le_book,year_month,total_assets), by=c("le_book","year_month")) %>%
@@ -1232,6 +1294,7 @@ renderValueBox({
 ### PNR16 – Borrowings {.value-box}
 ```{r}
 renderValueBox({
+  req(is_auth())
   d <- filter_df(df_pnr); ta <- filter_df(df_ta); val <- "–"
   if (!is.null(d) && !is.null(ta) && nrow(d)>0 && nrow(ta)>0) {
     j <- d %>% left_join(ta %>% select(le_book,year_month,total_assets), by=c("le_book","year_month")) %>%
@@ -1245,6 +1308,7 @@ renderValueBox({
 ### PNR18 – Equity Shares {.value-box}
 ```{r}
 renderValueBox({
+  req(is_auth())
   d <- filter_df(df_pnr); ta <- filter_df(df_ta); val <- "–"
   if (!is.null(d) && !is.null(ta) && nrow(d)>0 && nrow(ta)>0) {
     j <- d %>% left_join(ta %>% select(le_book,year_month,total_assets), by=c("le_book","year_month")) %>%
@@ -1265,6 +1329,7 @@ Row {data-height=420}
 # Each cell colour shows how close that institution is to breaching that limit.
 # Green → compliant, Gold → approaching limit, Maroon → breached.
 renderPlotly({
+  req(is_auth())
   d  <- filter_df(df_pnr)
   ta <- filter_df(df_ta)
   if (is.null(d) || is.null(ta) || nrow(d)==0) return(plotly_empty())
@@ -1322,6 +1387,7 @@ renderPlotly({
 
 ```{r}
 renderPlotly({
+  req(is_auth())
   d  <- filter_df(df_pnr)
   ta <- filter_df(df_ta)
   if (is.null(d) || is.null(ta) || nrow(d)==0) return(plotly_empty())
@@ -1369,6 +1435,7 @@ Row {data-height=320}
 # Detailed table showing every institution × month with all 6 PNR ratios.
 # Cells are colour-coded: green / amber / red based on % of the regulatory limit.
 renderDT({
+  req(is_auth())
   d  <- filter_df(df_pnr)
   ta <- filter_df(df_ta)
   if (is.null(d) || is.null(ta) || nrow(d)==0)

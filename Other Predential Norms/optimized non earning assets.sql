@@ -33,14 +33,53 @@ FROM (
         AND fhh.Year >= TO_CHAR(ADD_MONTHS(SYSDATE, -13), 'YYYY')
         AND lb.CATEGORY_TYPE IN ('MF','SACCO','OSACCO','DSACCO')
         AND frl.FRL_Line IN (
-            'F1120317','F1120319','F1120365','F1200230','F1200250','F1500010',
-            'F1500011','F1500012','F1500016','F1500017','F1500085','F1500086',
-            'F1500087','F1500088','F1500135','F1500145','F1500210','F1500211',
-            'F1500212','F1500213','F1500310','F1500410','F1500411','F1500412',
-            'F1500413','F1500422','F1500480','F1500510','F1500511','F1500512',
-            'F1500513','F1500550','F1500612','F1500690','F1500815','F1500830',
-            'F1500860','F1500980','F1501040','F1501030','F1200511','F1200315',
-            'F1200510','F1210440','F1210010','F1210015','F1200520'
+            'F1120317',  /* Fixed Term Deposits With Banks In Rwanda (LCY) */
+            'F1120319',  /* Fixed Term Deposits With Banks In Rwanda (FCY) */
+            'F1120365',  /* Accrual receivable interests with the banks & other FI (LCY) */
+            'F1200230',  /* Suspended interests (LCY) */
+            'F1200250',  /* Accrual receivable interests (LCY) */
+            'F1500010',  /* Overdrawn Accounts (LCY) */
+            'F1500011',  /* Provisions on NPL Overdrawn accounts(LCY) */
+            'F1500012',  /* Non performing Overdrwawn accounts(LCY) */
+            'F1500016',  /* Suspended Interest on Overdrawn A/C (LCY) */
+            'F1500017',  /* Suspended Interest on Overdrawn A/C (FCY) */
+            'F1500085',  /* Term treasury loans (LCY) */
+            'F1500086',  /* Non performing loans Treasury Loans(LCY) */
+            'F1500087',  /* Provisions on NPL Treasury Loans(LCY) */
+            'F1500088',  /* Suspended Interest on Treasury Loans (LCY) */
+            'F1500135',  /* Other Treasury Loans (LCY) */
+            'F1500145',  /* Accrual Receivable Interest on Treasury Loans (LCY) */
+            'F1500210',  /* Equipment loans (LCY) */
+            'F1500211',  /* Non performing loans Equipment Loans(LCY) */
+            'F1500212',  /* Provisions on NPL Equipment Loans(LCY) */
+            'F1500213',  /* Suspended Interest on Equipment Loans (LCY) */
+            'F1500310',  /* Accrual Receivable Interest on Equipment Loans (LCY) */
+            'F1500410',  /* Consumer loans (LCY) */
+            'F1500411',  /* Non performing loans Consumer Loans(LCY) */
+            'F1500412',  /* Provisions on NPL Consumer Loans(LCY) */
+            'F1500413',  /* Suspended Interests On Consumer Loans (LCY) */
+            'F1500422',  /* Provisions on NPL Consumer Loans(FCY) */
+            'F1500480',  /* Accrual Receivable Interests on Consumer Loans (LCY) */
+            'F1500510',  /* Mortgage Loans (LCY) */
+            'F1500511',  /* Non performing loans Mortgage Loan (LCY) */
+            'F1500512',  /* Provisions on NPL Mortgage Loan(LCY) */
+            'F1500513',  /* Suspended Interests on Mortgage Loan (LCY) */
+            'F1500550',  /* Accrual Receivable Interests on Mortgage Loan (LCY) */
+            'F1500612',  /* Provisions on NPL Finance Lease(LCY) */
+            'F1500690',  /* Accrual Receivable Interests on Finance Lease (LCY) */
+            'F1500815',  /* Loans To The Agriculture Sector And Agro Business Sector */
+            'F1500830',  /* Loans And Advances To Staff */
+            'F1500860',  /* Salary Advance */
+            'F1500980',  /* Other Loans of Clients (LCY) */
+            'F1501040',  /* Other loans and advances */
+            'F1501030',  /* Accrual Receivable Interests on other Loans of Clients (LCY) */
+            'F1200511',  /* Government ,Treasury Bonds HTM */
+            'F1200315',  /* Other debt securities */
+            'F1200510',  /* Treasury Bills HTM */
+            'F1210440',  /* Accrual receivable interests */
+            'F1210010',  /* Equity investment */
+            'F1210015',  /* Investment in subsidiaries */
+            'F1200520'  /* Accrual receivable interests on financial instruments HTM */
         )
 )
 UNPIVOT (
