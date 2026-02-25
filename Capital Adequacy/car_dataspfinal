@@ -1,0 +1,124 @@
+let
+    // Connect to SharePoint and get the CAR_MF.xlsx file
+    Source = SharePoint.Files("https://bnrw.sharepoint.com/sites/MicrofinanceDepartment", [ApiVersion = 15]),
+    FilteredFile = Table.SelectRows(Source, each 
+        [Folder Path] = "https://bnrw.sharepoint.com/sites/MicrofinanceDepartment/Shared Documents/11. CAR-LIQUIRATIO DATA/" 
+        and [Name] = "CAR_MF.xlsx"
+    ),
+    
+    // Get the Excel file content
+    FileContent = FilteredFile{0}[Content],
+    
+    // Load the workbook and get all sheets
+    ExcelWorkbook = Excel.Workbook(FileContent, null, true),
+    
+    // Filter to only data sheets (exclude hidden sheets)
+    DataSheets = Table.SelectRows(ExcelWorkbook, each [Kind] = "Sheet"),
+    
+    // Process each sheet - extract ONLY the 5 CAR rows we need
+    ProcessSheet = (sheetName as text, sheetData as table) =>
+        let
+            // Promote first row as headers
+            PromotedHeaders = Table.PromoteHeaders(sheetData, [PromoteAllScalars=true]),
+            
+            // Filter to ONLY the 5 CAR rows we need
+            FilteredRows = Table.SelectRows(PromotedHeaders, each 
+                [Description] = "Core capital" or
+                [Description] = "Total Core capital ""Tier 1"" (Line CAR07 less Line CAR13)" or
+                [Description] = "Total supplemenary capital" or
+                [Description] = "Core capital / Risk weighted asets (Tier 1 Capital Ratio)" or
+                [Description] = "Total capital/ Risk weighted assets (Total Capital Adequacy Ratio)"
+            ),
+            
+            // Get all column names
+            AllColumns = Table.ColumnNames(FilteredRows),
+            
+            // Keep only Description and institution columns (RW401, RW402, etc.)
+            InstitutionColumns = List.Select(AllColumns, each 
+                Text.StartsWith(_, "RW") or _ = "Description"
+            ),
+            SelectedColumns = Table.SelectColumns(FilteredRows, InstitutionColumns),
+            
+            // Unpivot institution columns
+            Unpivoted = Table.UnpivotOtherColumns(SelectedColumns, {"Description"}, "Microfinance", "Value"),
+            
+            // Add the quarter date from sheet name
+            QuarterDate = try Date.From(sheetName) otherwise null,
+            AddedQuarter = Table.AddColumn(Unpivoted, "Quoarter", each QuarterDate, type date)
+        in
+            AddedQuarter,
+    
+    // Apply ProcessSheet to each sheet
+    ProcessedSheets = Table.AddColumn(DataSheets, "ProcessedData", each 
+        ProcessSheet([Name], [Data])
+    ),
+    
+    // Combine all processed sheets
+    CombinedData = Table.Combine(ProcessedSheets[ProcessedData]),
+    
+    // Pivot by Description to create 5 columns for the CAR values
+    PivotedData = Table.Pivot(
+        CombinedData, 
+        List.Distinct(CombinedData[Description]), 
+        "Description", 
+        "Value"
+    ),
+    
+    // Change data types
+    ChangedTypes = Table.TransformColumnTypes(PivotedData, {
+        {"Core capital", Currency.Type},
+        {"Total Core capital ""Tier 1"" (Line CAR07 less Line CAR13)", Currency.Type},
+        {"Total supplemenary capital", Currency.Type},
+        {"Core capital / Risk weighted asets (Tier 1 Capital Ratio)", Percentage.Type}, 
+        {"Total capital/ Risk weighted assets (Total Capital Adequacy Ratio)", Percentage.Type}, 
+        {"Quoarter", type date}
+    }),
+    
+    // Clean up RW prefix from institution codes (RW401 → 401)
+    ReplacedRW = Table.ReplaceValue(ChangedTypes, "RW", "", Replacer.ReplaceText, {"Microfinance"}),
+    
+    // Extract LE_BOOK code (before the dash in Microfinance name)
+    AddedLEBook = Table.AddColumn(ReplacedRW, "LE_BOOK", each 
+        Text.BeforeDelimiter([Microfinance], "-"),
+        type text
+    ),
+    
+    // Reorder columns: LE_BOOK, Microfinance, Quoarter, then the 5 CAR values
+    ReorderedColumns = Table.ReorderColumns(AddedLEBook, {
+        "LE_BOOK",
+        "Microfinance",
+        "Quoarter",
+        "Core capital",
+        "Total Core capital ""Tier 1"" (Line CAR07 less Line CAR13)",
+        "Total supplemenary capital",
+        "Core capital / Risk weighted asets (Tier 1 Capital Ratio)",
+        "Total capital/ Risk weighted assets (Total Capital Adequacy Ratio)"
+    }),
+
+    // Convert Quoarter date to YEAR_MONTH integer (e.g. 2024-12-01 -> 202412)
+    // so it aligns with the DB source when appended
+    AddedYearMonth = Table.AddColumn(ReorderedColumns, "YEAR_MONTH", (row) => (Date.Year(row[Quoarter]) * 100 + Date.Month(row[Quoarter]))),
+
+    // Rename columns to match DB naming convention for clean append
+    RenamedForAppend = Table.RenameColumns(AddedYearMonth, {
+        {"Core capital", "CORE_CAPITAL"},
+        {"Total Core capital ""Tier 1"" (Line CAR07 less Line CAR13)", "TOTAL_CORE_CAPITAL_TIER_1"},
+        {"Total supplemenary capital", "TOTAL_SUPPLEMENTARY_CAPITAL_TIER_2"},
+        {"Core capital / Risk weighted asets (Tier 1 Capital Ratio)", "TIER_1_CAPITAL_RATIO"},
+        {"Total capital/ Risk weighted assets (Total Capital Adequacy Ratio)", "TOTAL_CAPITAL_ADEQUACY_RATIO"},
+        {"Quoarter", "DATE"},
+        {"Microfinance", "MICROFINANCE"}
+    }),
+
+    // Final column order matching DB table
+    FinalColumns = Table.SelectColumns(RenamedForAppend, {
+        "LE_BOOK",
+        "YEAR_MONTH",
+        "CORE_CAPITAL",
+        "TOTAL_CORE_CAPITAL_TIER_1",
+        "TOTAL_SUPPLEMENTARY_CAPITAL_TIER_2",
+        "TIER_1_CAPITAL_RATIO",
+        "TOTAL_CAPITAL_ADEQUACY_RATIO"
+    })
+in
+    FinalColumns

@@ -1,0 +1,101 @@
+let
+    // Connect to SharePoint and get the CAR_MF.xlsx file
+    Source = SharePoint.Files("https://bnrw.sharepoint.com/sites/MicrofinanceDepartment", [ApiVersion = 15]),
+    FilteredFile = Table.SelectRows(Source, each 
+        [Folder Path] = "https://bnrw.sharepoint.com/sites/MicrofinanceDepartment/Shared Documents/11. CAR-LIQUIRATIO DATA/" 
+        and [Name] = "CAR_MF.xlsx"
+    ),
+    
+    // Get the Excel file content
+    FileContent = FilteredFile{0}[Content],
+    
+    // Load the workbook and get all sheets
+    ExcelWorkbook = Excel.Workbook(FileContent, null, true),
+    
+    // Filter to only data sheets
+    DataSheets = Table.SelectRows(ExcelWorkbook, each [Kind] = "Sheet"),
+    
+    // Process each sheet
+    ProcessSheet = (sheetName as text, sheetData as table) =>
+        let
+            PromotedHeaders = Table.PromoteHeaders(sheetData, [PromoteAllScalars=true]),
+            
+            // Filter to only the rows we need
+            FilteredRows = Table.SelectRows(PromotedHeaders, each 
+                [Description] = "Core capital" or
+                [Description] = "Total Core capital ""Tier 1"" (Line CAR07 less Line CAR13)" or
+                [Description] = "Total supplemenary capital" or
+                [Description] = "Core capital / Risk weighted asets (Tier 1 Capital Ratio)" or
+                [Description] = "Total capital/ Risk weighted assets (Total Capital Adequacy Ratio)"
+            ),
+            
+            AllColumns = Table.ColumnNames(FilteredRows),
+            InstitutionColumns = List.Select(AllColumns, each 
+                Text.StartsWith(_, "RW") or _ = "Description"
+            ),
+            SelectedColumns = Table.SelectColumns(FilteredRows, InstitutionColumns),
+            Unpivoted = Table.UnpivotOtherColumns(SelectedColumns, {"Description"}, "Microfinance", "Value"),
+            
+            QuarterDate = try Date.From(sheetName) otherwise null,
+            AddedQuarter = Table.AddColumn(Unpivoted, "Quoarter", each QuarterDate, type date)
+        in
+            AddedQuarter,
+    
+    ProcessedSheets = Table.AddColumn(DataSheets, "ProcessedData", each 
+        ProcessSheet([Name], [Data])
+    ),
+    
+    CombinedData = Table.Combine(ProcessedSheets[ProcessedData]),
+    
+    PivotedData = Table.Pivot(
+        CombinedData, 
+        List.Distinct(CombinedData[Description]), 
+        "Description", 
+        "Value"
+    ),
+    
+    ChangedTypes = Table.TransformColumnTypes(PivotedData, {
+        {"Core capital", type number},
+        {"Total Core capital ""Tier 1"" (Line CAR07 less Line CAR13)", type number},
+        {"Total supplemenary capital", type number},
+        {"Core capital / Risk weighted asets (Tier 1 Capital Ratio)", type number}, 
+        {"Total capital/ Risk weighted assets (Total Capital Adequacy Ratio)", type number}, 
+        {"Quoarter", type date}
+    }),
+    
+    ReplacedRW = Table.ReplaceValue(ChangedTypes, "RW", "", Replacer.ReplaceText, {"Microfinance"}),
+    
+    AddedLEBook = Table.AddColumn(ReplacedRW, "LE_BOOK", each 
+        Text.BeforeDelimiter([Microfinance], "-"),
+        type text
+    ),
+    
+    AddedYearMonth = Table.AddColumn(AddedLEBook, "YEAR_MONTH", each 
+        Date.Year([Quoarter]) * 100 + Date.Month([Quoarter]),
+        Int64.Type
+    ),
+    
+    // Rename to match DB column names
+    RenamedColumns = Table.RenameColumns(AddedYearMonth, {
+        {"Core capital", "CORE_CAPITAL"},
+        {"Total Core capital ""Tier 1"" (Line CAR07 less Line CAR13)", "TOTAL_CORE_CAPITAL_TIER_1"},
+        {"Total supplemenary capital", "TOTAL_SUPPLEMENTARY_CAPITAL_TIER_2"},
+        {"Core capital / Risk weighted asets (Tier 1 Capital Ratio)", "TIER_1_CAPITAL_RATIO"},
+        {"Total capital/ Risk weighted assets (Total Capital Adequacy Ratio)", "TOTAL_CAPITAL_ADEQUACY_RATIO"}
+    }),
+    
+    // Keep only columns that exist in screenshot: LE_BOOK, Quoarter, and the 5 CAR columns
+    // Filter to only data BEFORE 2026 (since DB starts from 202601)
+    FilteredToBeforDB = Table.SelectRows(RenamedColumns, each [YEAR_MONTH] < 202601),
+    
+    FinalColumns = Table.SelectColumns(FilteredToBeforDB, {
+        "LE_BOOK",
+        "Quoarter",
+        "CORE_CAPITAL",
+        "TOTAL_CORE_CAPITAL_TIER_1",
+        "TOTAL_SUPPLEMENTARY_CAPITAL_TIER_2",
+        "TIER_1_CAPITAL_RATIO",
+        "TOTAL_CAPITAL_ADEQUACY_RATIO"
+    })
+in
+    FinalColumns

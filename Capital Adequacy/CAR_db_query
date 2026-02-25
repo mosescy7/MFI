@@ -1,0 +1,79 @@
+let
+    Source = Oracle.Database("172.16.1.17:1521/dwhprddb.bnr.rw", [HierarchicalNavigation=true, Query="SELECT
+    LE_BOOK,
+    YEAR_MONTH,
+    CORE_CAPITAL,
+    TIER_1_CAPITAL_RATIO,
+    TOTAL_CAPITAL_ADEQUACY_RATIO,
+    TOTAL_CORE_CAPITAL_TIER_1,
+    TOTAL_SUPPLEMENTARY_CAPITAL_TIER_2
+FROM (
+    SELECT
+        ca.LE_BOOK,
+        ca.YEAR_MONTH,
+        CASE
+            WHEN ast.ALPHA_SUBTAB_DESCRIPTION = 'Core capital'
+                THEN 'CORE_CAPITAL'
+            WHEN ast.ALPHA_SUBTAB_DESCRIPTION = 'Tier 1 Capital Ratio'
+                THEN 'TIER_1_CAPITAL_RATIO'
+            WHEN ast.ALPHA_SUBTAB_DESCRIPTION = 'Total Capital Adequacy Ratio'
+                THEN 'TOTAL_CAPITAL_ADEQUACY_RATIO'
+            WHEN ast.ALPHA_SUBTAB_DESCRIPTION LIKE 'Total Core capital%Tier 1%'
+                THEN 'TOTAL_CORE_CAPITAL_TIER_1'
+            WHEN ast.ALPHA_SUBTAB_DESCRIPTION LIKE 'Total supple%capital%Tier 2%'
+                THEN 'TOTAL_SUPPLEMENTARY_CAPITAL_TIER_2'
+        END AS CAR_LINE_CODE_DESC,
+        ca.VALUE_LCY
+    FROM vision.CAPITAL_AR ca
+    LEFT JOIN vision.ALPHA_SUB_TAB ast
+        ON ast.ALPHA_TAB = 5005
+       AND ast.ALPHA_SUB_TAB = ca.CAR_LINE_CODE
+    WHERE ca.YEAR_MONTH >= 202601
+      AND (
+          ast.ALPHA_SUBTAB_DESCRIPTION IN (
+              'Core capital',
+              'Tier 1 Capital Ratio',
+              'Total Capital Adequacy Ratio'
+          )
+          OR ast.ALPHA_SUBTAB_DESCRIPTION LIKE 'Total Core capital%Tier 1%'
+          OR ast.ALPHA_SUBTAB_DESCRIPTION LIKE 'Total supple%capital%Tier 2%'
+      )
+)
+PIVOT (
+    SUM(VALUE_LCY)
+    FOR CAR_LINE_CODE_DESC IN (
+        'CORE_CAPITAL'                     AS CORE_CAPITAL,
+        'TIER_1_CAPITAL_RATIO'             AS TIER_1_CAPITAL_RATIO,
+        'TOTAL_CAPITAL_ADEQUACY_RATIO'     AS TOTAL_CAPITAL_ADEQUACY_RATIO,
+        'TOTAL_CORE_CAPITAL_TIER_1'        AS TOTAL_CORE_CAPITAL_TIER_1,
+        'TOTAL_SUPPLEMENTARY_CAPITAL_TIER_2' AS TOTAL_SUPPLEMENTARY_CAPITAL_TIER_2
+    )
+)
+ORDER BY LE_BOOK, YEAR_MONTH
+"]),
+    
+    // Add Quoarter column from YEAR_MONTH
+    AddedQuarter = Table.AddColumn(Source, "Quoarter", each 
+        let
+            Year = Number.IntegerDivide([YEAR_MONTH], 100),
+            Month = Number.Mod([YEAR_MONTH], 100)
+        in
+            #date(Year, Month, 1),
+        type date
+    ),
+    
+    // Remove YEAR_MONTH since it's not in the screenshot
+    RemovedYearMonth = Table.RemoveColumns(AddedQuarter, {"YEAR_MONTH"}),
+    
+    // Reorder columns to match SharePoint structure
+    ReorderedColumns = Table.ReorderColumns(RemovedYearMonth, {
+        "LE_BOOK",
+        "Quoarter",
+        "CORE_CAPITAL",
+        "TOTAL_CORE_CAPITAL_TIER_1",
+        "TOTAL_SUPPLEMENTARY_CAPITAL_TIER_2",
+        "TIER_1_CAPITAL_RATIO",
+        "TOTAL_CAPITAL_ADEQUACY_RATIO"
+    })
+in
+    ReorderedColumns

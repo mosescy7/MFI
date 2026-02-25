@@ -1,0 +1,72 @@
+let
+    Source = SharePoint.Files("https://bnrw.sharepoint.com/sites/MicrofinanceDepartment", [ApiVersion = 15]),
+    #"Filtered Rows" = Table.SelectRows(Source, each ([Folder Path] = "https://bnrw.sharepoint.com/sites/MicrofinanceDepartment/Shared Documents/11. CAR-LIQUIRATIO DATA/") and ([Name] = "CAR_MF.xlsx")),
+    #"Filtered Hidden Files1" = Table.SelectRows(#"Filtered Rows", each [Attributes]?[Hidden]? <> true),
+    #"Invoke Custom Function1" = Table.AddColumn(#"Filtered Hidden Files1", "Transform File", each #"Transform File"([Content])),
+    #"Renamed Columns1" = Table.RenameColumns(#"Invoke Custom Function1", {"Name", "Source.Name"}),
+    #"Removed Other Columns1" = Table.SelectColumns(#"Renamed Columns1", {"Source.Name", "Transform File"}),
+    #"Expanded Table Column1" = Table.ExpandTableColumn(#"Removed Other Columns1", "Transform File", Table.ColumnNames(#"Transform File"(#"Sample File"))),
+  #"Changed Type" = Table.TransformColumnTypes(#"Expanded Table Column1", {
+        {"Source.Name", type text}, {"Name", type text}, {"Data", type any}, {"Item", type text}, {"Kind", type text}, {"Hidden", type logical}
+    }),
+
+    #"Removed Other Columns" = Table.SelectColumns(#"Changed Type", {"Data", "Name"}),
+
+    #"Renamed Columns" = Table.RenameColumns(#"Removed Other Columns", {{"Name", "Quarter"}}),
+
+    #"Expanded Data" = Table.ExpandTableColumn(#"Renamed Columns", "Data", {
+        "Column1", "Column2", "Column3", "Column4", "Column5", "Column6", "Column7", "Column8", "Column9", 
+        "Column10", "Column11", "Column12", "Column13", "Column14", "Column15", "Column16", "Column17", 
+        "Column18", "Column19", "Column20", "Column21", "Column22"
+    }),
+
+    #"Promoted Headers" = Table.PromoteHeaders(#"Expanded Data", [PromoteAllScalars = true]),
+
+    #"Changed Type1" = Table.TransformColumnTypes(#"Promoted Headers", {
+        {"Line Code", type text}, 
+        {"Description", type text}, 
+        {"RW401-Inkingi Microfinance", type any}, 
+        {"RW402-Amasezerano Community Banking PLC", type any}, 
+        {"RW403-VisionFund Rwanda PLC", type any}, 
+        {"RW404-Sager Ganza Microfinance PLC", type any}, 
+        {"RW405-COPEDU PLC", type any}, 
+        {"RW406-Duterimbere IMF PLC", type any}, 
+        {"RW408-Letshego Rwanda PLC", type any}, 
+        {"RW410-Goshen Finance PLC", type any}, 
+        {"RW411-RIM Ltd", type any}, 
+        {"RW413-Financial Safety Company Ltd", type any}, 
+        {"RW415- ASA Microfinance Rwanda PLC", type any}, 
+        {"RW416-Clecam Ejo Heza PLC", type any}, 
+        {"RW417-Umutanguha Finance Company PLC", type any}, 
+        {"RW418-Axon Tunga Microfinance PLC", type any}, 
+        {"RW419-Inkunga Finance PLC", type any}, 
+        {"RW420-UMURIMO FINANCE Ltd", type any}, 
+        {"RW421-JALI SC PLC", type any}, 
+        {"RW422-BRAC Rwanda Microfinance PLC", type any}, 
+        {"RW423-Atlantique Microfinance PLC", type any}, 
+        {"Total", type any}, 
+        {"31-MAR-2023", type text}
+    }),
+
+    #"Removed Top Rows" = Table.Skip(#"Changed Type1", 1),
+    #"Removed Repeated Headers" = Table.SelectRows(#"Removed Top Rows", each [Line Code] <> "Line Code"),
+    // Remove rows where Line Code is null or empty
+    #"Removed Null Line Codes" = Table.SelectRows(#"Removed Repeated Headers", each [Line Code] <> null and Text.Trim([Line Code]) <> ""),
+// Remove all section headers from anywhere in the table
+    #"Removed Section Headers" = Table.SelectRows(#"Removed Null Line Codes", each 
+    not Text.StartsWith(Text.Upper(Text.Trim([Description])), "I. CORE CAPITAL") and
+    not Text.StartsWith(Text.Upper(Text.Trim([Description])), "II. SUPPLEMENTARY CAPITAL") and
+    not Text.StartsWith(Text.Upper(Text.Trim([Description])), "III. CAPITAL ADEQUACY RATIO")
+    ),
+    #"Removed Other Columns2" = Table.SelectColumns(#"Removed Section Headers",{"Description", "RW401-Inkingi Microfinance", "RW402-Amasezerano Community Banking PLC", "RW403-VisionFund Rwanda PLC", "RW404-Sager Ganza Microfinance PLC", "RW405-COPEDU PLC", "RW406-Duterimbere IMF PLC", "RW408-Letshego Rwanda PLC", "RW410-Goshen Finance PLC", "RW411-RIM Ltd", "RW413-Financial Safety Company Ltd", "RW415- ASA Microfinance Rwanda PLC", "RW416-Clecam Ejo Heza PLC", "RW417-Umutanguha Finance Company PLC", "RW418-Axon Tunga Microfinance PLC", "RW419-Inkunga Finance PLC", "RW420-UMURIMO FINANCE Ltd", "RW421-JALI SC PLC", "RW422-BRAC Rwanda Microfinance PLC", "RW423-Atlantique Microfinance PLC", "31-MAR-2023"}),
+    #"Renamed Columns2" = Table.RenameColumns(#"Removed Other Columns2",{{"31-MAR-2023", "Quoarter"}}),
+    #"Reordered Columns" = Table.ReorderColumns(#"Renamed Columns2",{"Quoarter", "Description", "RW401-Inkingi Microfinance", "RW402-Amasezerano Community Banking PLC", "RW403-VisionFund Rwanda PLC", "RW404-Sager Ganza Microfinance PLC", "RW405-COPEDU PLC", "RW406-Duterimbere IMF PLC", "RW408-Letshego Rwanda PLC", "RW410-Goshen Finance PLC", "RW411-RIM Ltd", "RW413-Financial Safety Company Ltd", "RW415- ASA Microfinance Rwanda PLC", "RW416-Clecam Ejo Heza PLC", "RW417-Umutanguha Finance Company PLC", "RW418-Axon Tunga Microfinance PLC", "RW419-Inkunga Finance PLC", "RW420-UMURIMO FINANCE Ltd", "RW421-JALI SC PLC", "RW422-BRAC Rwanda Microfinance PLC", "RW423-Atlantique Microfinance PLC"}),
+    #"Unpivoted Other Columns" = Table.UnpivotOtherColumns(#"Reordered Columns", {"Description", "Quoarter"}, "Attribute", "Value"),
+    #"Renamed Columns3" = Table.RenameColumns(#"Unpivoted Other Columns",{{"Attribute", "Microfinance"}}),
+    #"Pivoted Column" = Table.Pivot(#"Renamed Columns3", List.Distinct(#"Renamed Columns3"[Description]), "Description", "Value", List.Sum),
+    #"Changed Type2" = Table.TransformColumnTypes(#"Pivoted Column",{{"Core capital / Risk weighted asets (Tier 1 Capital Ratio)", Percentage.Type}, {"Total capital/ Risk weighted assets (Total Capital Adequacy Ratio)", Percentage.Type}, {"Quoarter", type date}, {"Paid-up shares", Currency.Type}, {"Share premium", Currency.Type}, {"Prior years' retained earnings", Currency.Type}, {"Net Profit of the period After tax (50% for unaudited Year-to-date profit)", Currency.Type}, {"All disclosed reserves", Currency.Type}, {"Permanent grants or subsidies", Currency.Type}, {"Core capital", Currency.Type}, {"Goodwill and other intangible assets", Currency.Type}, {"Current financial year's losses", Currency.Type}, {"Deficiencies in provisions for losses", Currency.Type}, {"Other deductions that may be determined by the Central Bank", Currency.Type}, {"Total deductions", Currency.Type}, {"Total Core capital ""Tier 1"" (Line CAR07 less Line CAR13)", Currency.Type}, {"Revaluation reserves (up to 25%)", Currency.Type}, {"Hybrid capital instruments", Currency.Type}, {"Subordinated debts", Currency.Type}, {"Total supplemenary capital", Currency.Type}, {"Total capital (core capital + supplementary capital) (Line CAR14 + Line CAR18)", Currency.Type}, {"Total RISK WEIGHTED ASSETS", Currency.Type}}),
+    #"Replaced Value" = Table.ReplaceValue(#"Changed Type2","RW","",Replacer.ReplaceText,{"Microfinance"}),
+    #"Added Custom Column" = Table.AddColumn(#"Replaced Value", "YEAR-MONTH", each Text.Combine({Date.ToText([Quoarter], "yyyy"), "-", Date.ToText([Quoarter], "MM")}), type text),
+    #"Inserted Text Before Delimiter" = Table.AddColumn(#"Added Custom Column", "LE_BOOK", each Text.BeforeDelimiter([Microfinance], "-"), type text)
+in
+    #"Inserted Text Before Delimiter"

@@ -1,0 +1,15 @@
+let
+    // Get SharePoint data (historical data before 2026)
+    SharePointData = CAR_DATAsp,
+    
+    // Get DB data (current data from 2026 onwards)
+    DBData = car_db_quey,
+    
+    // Combine both tables
+    Combined = Table.Combine({SharePointData, DBData}),
+    
+    // Sort by LE_BOOK and Quoarter
+    Sorted = Table.Sort(Combined, {{"LE_BOOK", Order.Ascending}, {"Quoarter", Order.Ascending}})
+in
+    Sorted
+
