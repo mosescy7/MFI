@@ -44,8 +44,9 @@ mfi_car AS (
         pvt.LE_BOOK                         AS LE_Book,
         pvt.YEAR_MONTH                      AS Year_Month,
         pvt.TOTAL_CORE_CAPITAL_TIER_1       AS Total_Capital,  -- equivalent to Sacco Total_Capital
-        NULL                                AS Assets_Amt,
-        pvt.TOTAL_CAPITAL_ADEQUACY_RATIO / 100  AS CAR_Pct,  -- divided by 100 to match Sacco decimal ratio
+        NULL                                        AS Assets_Amt,
+        pvt.TOTAL_SUPPLEMENTARY_CAPITAL_TIER_2      AS Total_Supplementary_Capital_Tier_2,
+        pvt.TOTAL_CAPITAL_ADEQUACY_RATIO / 100      AS CAR_Pct,  -- divided by 100 to match Sacco decimal ratio
         'MICROFINANCE'                      AS Institution_Type
     FROM (
         SELECT
@@ -93,6 +94,7 @@ SELECT
     Institution_Type,
     Total_Capital,
     Assets_Amt,
+    Total_Supplementary_Capital_Tier_2,
     CAR_Pct
 FROM sacco_car
 
@@ -104,6 +106,7 @@ SELECT
     Institution_Type,
     Total_Capital,
     Assets_Amt,
+    Total_Supplementary_Capital_Tier_2,
     CAR_Pct
 FROM mfi_car
 
