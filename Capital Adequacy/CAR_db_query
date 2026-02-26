@@ -1,3 +1,4 @@
+// CAR_db_query
 let
     Source = Oracle.Database("172.16.1.17:1521/dwhprddb.bnr.rw", [HierarchicalNavigation=true, Query="SELECT
     LE_BOOK,

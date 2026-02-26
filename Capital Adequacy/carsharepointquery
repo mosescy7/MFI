@@ -1,3 +1,4 @@
+// CAR_combined_query
 let
     // Connect to SharePoint and get the CAR_MF.xlsx file
     Source = SharePoint.Files("https://bnrw.sharepoint.com/sites/MicrofinanceDepartment", [ApiVersion = 15]),

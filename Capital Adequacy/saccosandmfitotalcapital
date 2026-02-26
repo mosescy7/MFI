@@ -1,16 +1,16 @@
-// CAR_combined_query
+// CAR_combined_query_WITH_SACCOES
 let
     // Get SharePoint data (historical data before 2026)
-    SharePointData = CAR_DATAsp,
+    SharePointData = CAR_DATAsharepoint,
     
     // Get DB data (current data from 2026 onwards)
-    DBData = car_db_quey,
+    DBData = Combines_sacco_MFI_Capital,
     
     // Combine both tables
     Combined = Table.Combine({SharePointData, DBData}),
     
     // Sort by LE_BOOK and Quoarter
-    Sorted = Table.Sort(Combined, {{"LE_BOOK", Order.Ascending}, {"Quoarter", Order.Ascending}})
+    Sorted = Table.Sort(Combined, {{"LE_BOOK", Order.Ascending}})
 in
     Sorted
-
+    
