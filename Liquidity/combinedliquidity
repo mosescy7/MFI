@@ -1,0 +1,6 @@
+let
+    Source = Table.Combine({liquiditymf, LIQUIDRATIO_DSACCO}),
+    #"Removed Columns" = Table.RemoveColumns(Source,{"Cash held in electronic means", "Accrued interests on deposits with FIs", "Interests payable on customers' deposits"})
+in
+    #"Removed Columns"
+    

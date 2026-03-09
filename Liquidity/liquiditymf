@@ -1,0 +1,61 @@
+let
+    // ── your steps up to #"Removed Repeated Headers" ────────────────────────────
+    Source = SharePoint.Files("https://bnrw.sharepoint.com/sites/MicrofinanceDepartment", [ApiVersion = 15]),
+    #"Filtered Rows" = Table.SelectRows(Source, each
+        [Folder Path] = "https://bnrw.sharepoint.com/sites/MicrofinanceDepartment/Shared Documents/11. CAR-LIQUIRATIO DATA/"
+        and [Name] = "LIQUIRATIO_MF.xlsx"
+    ),
+    #"Filtered Hidden Files1" = Table.SelectRows(#"Filtered Rows", each [Attributes]?[Hidden]? <> true),
+    #"Invoke Custom Function1" = Table.AddColumn(#"Filtered Hidden Files1", "Transform File", each #"Transform File"([Content])),
+    #"Renamed Columns1" = Table.RenameColumns(#"Invoke Custom Function1", {"Name","Source.Name"}),
+    #"Removed Other Columns1" = Table.SelectColumns(#"Renamed Columns1", {"Source.Name","Transform File"}),
+    #"Expanded Table Column1" = Table.ExpandTableColumn(#"Removed Other Columns1","Transform File", Table.ColumnNames(#"Transform File"(#"Sample File"))),
+    #"Changed Type (staging)" = Table.TransformColumnTypes(#"Expanded Table Column1",{{"Source.Name", type text},{"Name", type text},{"Data", type any},{"Item", type text},{"Kind", type text},{"Hidden", type logical}}),
+    #"Removed Other Columns (keep Data+Name)" = Table.SelectColumns(#"Changed Type (staging)",{"Data","Name"}),
+    #"Rename Name->QuarterFile" = Table.RenameColumns(#"Removed Other Columns (keep Data+Name)",{{"Name","QuarterFile"}}),
+    #"Expanded Data" = Table.ExpandTableColumn(#"Rename Name->QuarterFile","Data",{
+        "Column1","Column2","Column3","Column4","Column5","Column6","Column7","Column8","Column9",
+        "Column10","Column11","Column12","Column13","Column14","Column15","Column16","Column17",
+        "Column18","Column19","Column20","Column21","Column22","Column23","Column24"
+    }),
+    #"Promoted Headers" = Table.PromoteHeaders(#"Expanded Data", [PromoteAllScalars=true]),
+    #"Removed Nulls in Column2" =
+    Table.SelectRows(#"Promoted Headers", each 
+        [Column2] <> null and Text.Trim(Text.From([Column2])) <> ""
+    ),
+    #"Promoted Headers1" = Table.PromoteHeaders(#"Removed Nulls in Column2", [PromoteAllScalars=true]),
+    #"Renamed Columns" = Table.RenameColumns(#"Promoted Headers1",{{"Total", "RW424-AB Rwanda Plc"}, {"Column24", "RW425-URWEGO FINANCE CBC"}}),
+    #"Removed Columns" = Table.RemoveColumns(#"Renamed Columns",{"Category"}),
+        // 🔹 NEW STEP: Remove repeated headers inside the data
+    #"Removed Repeated Headers" =
+        Table.SelectRows(#"Removed Columns", each 
+            [Line] <> "Line" and
+            [Descriptions] <> "Descriptions" and
+            [Line] <> null and
+            Text.Trim([Line]) <> ""
+        ),
+    #"Removed Columns1" = Table.RemoveColumns(#"Removed Repeated Headers",{"Line"}),
+    #"Reordered Columns" = Table.ReorderColumns(#"Removed Columns1",{"31-MAR-2023", "Descriptions", "RW401-Inkingi Microfinance", "RW402-Amasezerano Community Banking PLC", "RW403-VisionFund Rwanda PLC", "RW404-Sager Ganza Microfinance PLC", "RW405-COPEDU PLC", "RW406-Duterimbere IMF PLC", "RW408-Letshego Rwanda PLC", "RW410-Goshen Finance PLC", "RW411-RIM Ltd", "RW413-Financial Safety Company Ltd", "RW415- ASA Microfinance Rwanda PLC", "RW416-Clecam Ejo Heza PLC", "RW417-Umutanguha Finance Company PLC", "RW418-Axon Tunga Microfinance PLC", "RW419-Inkunga Finance PLC", "RW420-UMURIMO FINANCE Ltd", "RW421-JALI SC PLC", "RW422-BRAC Rwanda Microfinance PLC", "RW423-Atlantique Microfinance PLC", "RW424-AB Rwanda Plc", "RW425-URWEGO FINANCE CBC"}),
+    #"Unpivoted Other Columns" = Table.UnpivotOtherColumns(#"Reordered Columns", {"31-MAR-2023", "Descriptions"}, "Attribute", "Value"),
+    #"Renamed Columns2" = Table.RenameColumns(#"Unpivoted Other Columns",{{"Attribute", "Microfinance"}, {"Value", "Amount"}}),
+    #"Changed Type" = Table.TransformColumnTypes(#"Renamed Columns2",{{"Amount", Int64.Type}}),
+    #"Pivoted Column" = Table.Pivot(#"Changed Type", List.Distinct(#"Changed Type"[Descriptions]), "Descriptions", "Amount", List.Sum),
+    #"Renamed Columns3" = Table.RenameColumns(#"Pivoted Column",{{"31-MAR-2023", "Date"}}),
+    // remove "RW" prefix from Microfinance codes
+#"Strip RW Prefix" =
+    Table.ReplaceValue(#"Renamed Columns3","RW","",Replacer.ReplaceText,{"Microfinance"}),
+
+// add YEAR-MONTH from the Date column (safe-casts to date first)
+#"Add YEAR-MONTH" =
+    Table.AddColumn(#"Strip RW Prefix","YEAR-MONTH",
+        each Date.ToText(Date.From([Date]), "yyyy-MM"), type text),
+
+// derive LE_BOOK from the Microfinance field (text before the dash)
+#"Add LE_BOOK" =
+    Table.AddColumn(#"Add YEAR-MONTH","LE_BOOK",
+        each Text.BeforeDelimiter([Microfinance], "-"), type text),
+    #"Renamed Columns4" = Table.RenameColumns(#"Add LE_BOOK",{{"Microfinance", "Leb_DESC"}}),
+    #"Changed Type1" = Table.TransformColumnTypes(#"Renamed Columns4",{{"Date", type date}}),
+    #"Reordered Columns1" = Table.ReorderColumns(#"Changed Type1",{"Date", "Leb_DESC", "Cash in Vaults", "Cash held in ATMs", "Cash held in electronic means", "Cash held in Central Bank", "Cash held in Banks and Other Financial Institutions on current accounts", "Total Balances due from Banks and Other Financial Institutions on savings/term deposit accounts", "Balances held in banks outside Rwanda", "Accrued interests on deposits with FIs", "Treasury Bills/Bonds issued by Government of Rwanda", " TOTAL LIQUID ASSETS  (A)", "Demand Deposits", "Savings Deposits due within 3 months from the balance sheet date", "Term Deposits due within 3 months from the balance sheet date", "Security/Collateral Deposits due within 3 months from the balance sheet date", "Interests payable on customers' deposits", "Borrowings (Principal amount of Installments due within 3 months from the balance sheet date)", "Payables due within 3 months from the balance sheet date", "Contingent Liabilities", " TOTAL LIQUID LIABILITIES (B)", " LIQUIDITY RATIO = A ÷ B", "Cash held in Banks and Other Financial Institutions on savings/term deposit accounts", "Borrowings Installments due within 3 months from the balance sheet date", "LE_BOOK", "YEAR-MONTH"})
+in
+    #"Reordered Columns1"
